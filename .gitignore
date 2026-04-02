@@ -1,0 +1,90 @@
+# Node modules
+node_modules/
+
+# Environment files
+.env
+.env.local
+.env.production
+
+# Database
+*.sqlite
+*.db
+
+# Logs
+*.log
+error.log
+access.log
+
+# Uploads
+uploads/
+temp/
+cache/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Test files
+test*.php
+test*.html
+debug*.php
+
+# Backup files
+*.bak
+*.backup
+*.old
+
+# Sensitive files
+config.php
+database/config.php
+includes/auto_email_sender.php
+
+# User uploads
+uploads/
+user_files/
+profile_pictures/
+
+# Session files
+sessions/
+cookies/
+
+# Cache
+cache/
+temp/
+tmp/
+
+# Build files
+dist/
+build/
+
+# Package managers
+package-lock.json
+yarn.lock
+
+# PHP specific
+.php_cs.cache
+.php_cs
+.phpunit.result.cache
+
+# Laravel specific (if using)
+.storage/
+.app/bootstrap/cache/
+
+# WordPress specific (if using)
+wp-content/cache/
+wp-content/uploads/
+wp-content/plugins/*/vendor/
+
+# Custom Sentinel Cameroon files
+*.tmp
+*.temp
+logs/
+backups/

@@ -1,0 +1,19 @@
+{
+  "name": "sentinel-cameroon",
+  "version": "1.0.0",
+  "description": "Community Safety Platform for Cameroon",
+  "main": "index.php",
+  "author": "Sentinel Cameroon Team",
+  "license": "MIT",
+  "keywords": ["safety", "incidents", "cameroon", "community", "emergency", "reporting"],
+  "require": {
+    "php": ">=8.0",
+    "mysql": ">=5.7"
+  },
+  "autoload": {
+    "psr-4": {
+      "src": "database/",
+      "prefix": "Database\\"
+    }
+  }
+}
