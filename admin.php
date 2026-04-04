@@ -62,6 +62,25 @@ if ($role === 'admin') {
 
 // --- 6. PARTNERS ---
 $all_partners = $db->query("SELECT * FROM partners ORDER BY is_sponsored DESC, name ASC")->fetchAll();
+
+// --- 7. REVENUE ---
+$revenue_stats = [
+    'total_marketplace' => $db->query("SELECT SUM(amount_fcfa) as total FROM marketplace_payments WHERE status = 'confirmed'")->fetch()['total'] ?? 0,
+    'mrr' => $db->query("SELECT SUM(monthly_fee) as total FROM partners WHERE is_sponsored = 1")->fetch()['total'] ?? 0,
+    'authority_annual' => $db->query("SELECT COUNT(*) * 100000 as total FROM users WHERE role = 'authority' AND subscription_tier = 'premium'")->fetch()['total'] ?? 0,
+    'pending_marketplace' => $db->query("SELECT COUNT(*) as count FROM marketplace_payments WHERE status = 'pending'")->fetch()['count']
+];
+
+$all_authorities = $db->query("SELECT * FROM users WHERE role = 'authority' ORDER BY subscription_tier DESC, full_name ASC")->fetchAll();
+
+$pending_payments = $db->query("
+    SELECT p.*, l.title as listing_title, u.full_name as seller_name
+    FROM marketplace_payments p
+    JOIN marketplace_listings l ON p.listing_id = l.id
+    JOIN users u ON p.user_id = u.id
+    WHERE p.status = 'pending'
+    ORDER BY p.created_at ASC
+")->fetchAll();
 ?>
 
 <style>
@@ -169,6 +188,8 @@ $all_partners = $db->query("SELECT * FROM partners ORDER BY is_sponsored DESC, n
             <?php endif; ?>
             <button class="admin-tab-btn" onclick="showTab('partners')"><span
                     class="material-symbols-outlined">handshake</span> Partners</button>
+            <button class="admin-tab-btn" onclick="showTab('revenue')" style="color: var(--rs-success);"><span
+                    class="material-symbols-outlined">payments</span> Revenue</button>
             <button class="admin-tab-btn" onclick="showTab('alerts')" style="color: var(--rs-error);"><span
                     class="material-symbols-outlined">emergency_share</span> Send Alerts</button>
         </div>
@@ -416,7 +437,10 @@ $all_partners = $db->query("SELECT * FROM partners ORDER BY is_sponsored DESC, n
 
             <!-- PARTNERS TAB -->
             <div id="partners" class="tab-content">
-                <h3 style="margin-bottom: 1.5rem;">Emergency Ecosystem Partners</h3>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                    <h3 style="margin: 0;">Emergency Ecosystem Partners</h3>
+                    <button class="btn-rs btn-rs-primary" onclick="showTab('revenue')"><span class="material-symbols-outlined">military_tech</span> Manage Sponsorships</button>
+                </div>
                 <div class="rs-card" style="padding: 0; overflow-x: auto;">
                     <table class="styled-table">
                         <thead>
@@ -433,12 +457,12 @@ $all_partners = $db->query("SELECT * FROM partners ORDER BY is_sponsored DESC, n
                                     <td style="font-weight: 700; color: var(--rs-primary);">
                                         <?php echo htmlspecialchars($p['name']); ?></td>
                                     <td><span
-                                            style="font-size: 0.7rem; font-weight: 800; background: #f1f5f9; padding: 4px 8px; border-radius: 4px;"><?php echo strtoupper($p['partner_type']); ?></span>
+                                             style="font-size: 0.7rem; font-weight: 800; background: #f1f5f9; padding: 4px 8px; border-radius: 4px;"><?php echo strtoupper($p['partner_type']); ?></span>
                                     </td>
                                     <td>
                                         <?php if ($p['is_sponsored']): ?>
                                             <span style="color: #ea580c; font-weight: 900; font-size: 0.7rem;">★
-                                                SPONSORED</span>
+                                                <?php echo strtoupper($p['sponsor_tier'] ?? 'SPONSORED'); ?></span>
                                         <?php else: ?>
                                             <span style="color: #cbd5e1; font-weight: 600; font-size: 0.7rem;">GENERAL</span>
                                         <?php endif; ?>
@@ -451,6 +475,225 @@ $all_partners = $db->query("SELECT * FROM partners ORDER BY is_sponsored DESC, n
                     </table>
                 </div>
             </div>
+
+            <!-- REVENUE TAB -->
+            <div id="revenue" class="tab-content">
+                <h3 style="margin-bottom: 1.5rem;">Revenue & Monetization Management</h3>
+                
+                <div class="rs-grid rs-grid-stats" style="margin-bottom: 2.5rem;">
+                    <div class="rs-card" style="background: #f0fdf4; border: 1px solid #bbf7d0;">
+                        <div class="text-label" style="color: #166534;">Marketplace Sales</div>
+                        <div class="text-value" style="color: #15803d;"><?php echo number_format($revenue_stats['total_marketplace']); ?> <span style="font-size: 0.8rem;">FCFA</span></div>
+                    </div>
+                    <div class="rs-card" style="background: #fffbeb; border: 1px solid #fef3c7;">
+                        <div class="text-label" style="color: #92400e;">Active MRR (Partners)</div>
+                        <div class="text-value" style="color: #b45309;"><?php echo number_format($revenue_stats['mrr']); ?> <span style="font-size: 0.8rem;">FCFA/mo</span></div>
+                    </div>
+                    <div class="rs-card" style="background: #eff6ff; border: 1px solid #dbeafe;">
+                        <div class="text-label" style="color: #1a56db;">Authority Subscriptions</div>
+                        <div class="text-value" style="color: #1e40af;"><?php echo number_format($revenue_stats['authority_annual']); ?> <span style="font-size: 0.8rem;">FCFA/yr</span></div>
+                    </div>
+                    <div class="rs-card" style="background: #f8fafc; border: 1px solid #e2e8f0;">
+                        <div class="text-label">Pending Payments</div>
+                        <div class="text-value" style="color: var(--rs-primary);"><?php echo $revenue_stats['pending_marketplace']; ?></div>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
+                    <!-- Pending Marketplace Payments -->
+                    <div class="rs-card" style="padding: 0;">
+                        <div style="padding: 1.5rem; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center;">
+                            <h4 style="margin: 0;">Marketplace Approvals</h4>
+                            <span class="badge" style="background: var(--rs-secondary); color: white; padding: 2px 8px; border-radius: 12px; font-size: 0.7rem; font-weight: 800;"><?php echo count($pending_payments); ?> NEW</span>
+                        </div>
+                        <?php if (empty($pending_payments)): ?>
+                            <p style="padding: 2rem; text-align: center; color: #94a3b8; font-size: 0.9rem;">No pending marketplace payments.</p>
+                        <?php else: ?>
+                            <div style="max-height: 400px; overflow-y: auto;">
+                                <table class="styled-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Seller / Listing</th>
+                                            <th>Reference</th>
+                                            <th>Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php foreach ($pending_payments as $pay): ?>
+                                            <tr>
+                                                <td>
+                                                    <div style="font-weight: 700;"><?php echo htmlspecialchars($pay['seller_name']); ?></div>
+                                                    <div style="font-size: 0.75rem; color: #64748b;"><?php echo htmlspecialchars($pay['listing_title']); ?></div>
+                                                </td>
+                                                <td>
+                                                    <div style="font-family: monospace; font-size: 0.8rem;"><?php echo htmlspecialchars($pay['payment_reference'] ?? 'No Ref'); ?></div>
+                                                    <div style="font-size: 0.7rem; color: #94a3b8;"><?php echo htmlspecialchars($pay['payment_phone']); ?></div>
+                                                </td>
+                                                <td>
+                                                    <div style="display: flex; gap: 5px;">
+                                                        <button onclick="manageRevenue('confirm_payment', {payment_id: <?php echo $pay['id']; ?>, listing_id: <?php echo $pay['listing_id']; ?>})" class="btn-rs" style="padding: 5px; background: #dcfce7; color: #15803d; border-radius: 6px;"><span class="material-symbols-outlined" style="font-size: 1rem;">check</span></button>
+                                                        <button onclick="manageRevenue('reject_payment', {payment_id: <?php echo $pay['id']; ?>, listing_id: <?php echo $pay['listing_id']; ?>})" class="btn-rs" style="padding: 5px; background: #fee2e2; color: #b91c1c; border-radius: 6px;"><span class="material-symbols-outlined" style="font-size: 1rem;">close</span></button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+
+                    <!-- Partner Sponsorship Management -->
+                    <div class="rs-card" style="padding: 0;">
+                        <div style="padding: 1.5rem; border-bottom: 1px solid #f1f5f9;">
+                            <h4 style="margin: 0;">Partner Sponsorships</h4>
+                        </div>
+                        <div style="max-height: 400px; overflow-y: auto;">
+                            <table class="styled-table">
+                                <thead>
+                                    <tr>
+                                        <th>Partner</th>
+                                        <th>Current Tier</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ($all_partners as $p): ?>
+                                        <tr>
+                                            <td>
+                                                <div style="font-weight: 700;"><?php echo htmlspecialchars($p['name']); ?></div>
+                                                <div style="font-size: 0.75rem; color: #64748b;"><?php echo $p['is_sponsored'] ? 'Expires: ' . date('M d, Y', strtotime($p['sponsor_expires_at'])) : 'Unsponsored'; ?></div>
+                                            </td>
+                                            <td>
+                                                <span style="font-size: 0.7rem; font-weight: 800; padding: 4px 8px; border-radius: 4px; background: <?php echo $p['sponsor_tier'] === 'gold' ? '#fef3c7' : ($p['sponsor_tier'] === 'silver' ? '#f1f5f9' : '#f8fafc'); ?>; color: <?php echo $p['sponsor_tier'] === 'gold' ? '#b45309' : ($p['sponsor_tier'] === 'silver' ? '#475569' : '#94a3b8'); ?>; border: 1px solid <?php echo $p['sponsor_tier'] === 'gold' ? '#fcd34d' : ($p['sponsor_tier'] === 'silver' ? '#cbd5e1' : '#e2e8f0'); ?>;">
+                                                    <?php echo strtoupper($p['sponsor_tier'] ?? 'LISTED'); ?>
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <button onclick="openSponsorModal(<?php echo $p['id']; ?>, '<?php echo htmlspecialchars(addslashes($p['name'])); ?>')" class="btn-rs btn-rs-outline" style="padding: 6px; font-size: 0.75rem;">Modify</button>
+                                            </td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="margin-top: 2rem;">
+                    <!-- Authority Subscription Management -->
+                    <div class="rs-card" style="padding: 0;">
+                        <div style="padding: 1.5rem; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center;">
+                            <h4 style="margin: 0;">Official Subscriptions (NGOs/Security Firms)</h4>
+                            <span class="badge" style="background: #eff6ff; color: #1e40af; padding: 4px 10px; border-radius: 12px; font-size: 0.7rem; font-weight: 800;">100,000 FCFA / YR</span>
+                        </div>
+                        <div style="max-height: 400px; overflow-y: auto;">
+                            <table class="styled-table">
+                                <thead>
+                                    <tr>
+                                        <th>Official</th>
+                                        <th>Tier</th>
+                                        <th>Status</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ($all_authorities as $auth): ?>
+                                        <tr>
+                                            <td>
+                                                <div style="font-weight: 700;"><?php echo htmlspecialchars($auth['full_name']); ?></div>
+                                                <div style="font-size: 0.7rem; color: #94a3b8;"><?php echo htmlspecialchars($auth['email']); ?></div>
+                                            </td>
+                                            <td>
+                                                <span style="font-size: 0.7rem; font-weight: 800; padding: 4px 8px; border-radius: 6px; background: <?php echo $auth['subscription_tier'] === 'premium' ? '#dbeafe' : '#f1f5f9'; ?>; color: <?php echo $auth['subscription_tier'] === 'premium' ? '#1e40af' : '#64748b'; ?>;">
+                                                    <?php echo strtoupper($auth['subscription_tier'] ?? 'BASIC'); ?>
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <span style="font-size: 0.65rem; font-weight: 900; color: <?php echo $auth['subscription_status'] === 'active' ? '#16a34a' : ($auth['subscription_status'] === 'expired' ? '#dc2626' : '#94a3b8'); ?>;">
+                                                    <?php echo strtoupper($auth['subscription_status'] ?? 'NONE'); ?>
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <button onclick="openSubscriptionModal(<?php echo $auth['id']; ?>, '<?php echo htmlspecialchars(addslashes($auth['full_name'])); ?>', '<?php echo $auth['subscription_tier']; ?>')" class="btn-rs btn-rs-outline" style="padding: 6px; font-size: 0.75rem;">Modify</button>
+                                            </td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Authority Subscription Modal -->
+            <div id="subModal" class="modal-overlay" style="display:none;">
+                <div class="modal-box" style="max-width: 400px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                        <h3 style="margin: 0;">Plan: <span id="subName"></span></h3>
+                        <button onclick="document.getElementById('subModal').style.display='none'" style="background: none; border: none; cursor: pointer;"><span class="material-symbols-outlined">close</span></button>
+                    </div>
+                    <form id="subForm" onsubmit="event.preventDefault(); submitSubscription();">
+                        <input type="hidden" id="subUserId">
+                        <div style="margin-bottom: 1.25rem;">
+                            <label style="display: block; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; color: #64748b; margin-bottom: 8px;">Subscription Tier</label>
+                            <select id="subTier" class="form-field" style="width: 100%;">
+                                <option value="basic">Basic (Free)</option>
+                                <option value="premium">Premium NGO (100,000 FCFA/YR)</option>
+                            </select>
+                        </div>
+                        <div style="margin-bottom: 1.5rem;">
+                            <label style="display: block; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; color: #64748b; margin-bottom: 8px;">Expiry Date</label>
+                            <input type="date" id="subExpiry" class="form-field" style="width: 100%;" value="<?php echo date('Y-m-d', strtotime('+1 year')); ?>">
+                        </div>
+                        <button type="submit" class="btn-rs btn-rs-primary" style="width: 100%; justify-content: center; padding: 1rem;">Update Subscription</button>
+                    </form>
+                </div>
+
+            <!-- Sponsor Modal -->
+            <div id="sponsorModal" class="modal-overlay" style="display:none;">
+                <div class="modal-box" style="max-width: 450px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                        <h3 style="margin: 0;">Sponsorship: <span id="sponsorPartnerName"></span></h3>
+                        <button onclick="document.getElementById('sponsorModal').style.display='none'" style="background: none; border: none; cursor: pointer;"><span class="material-symbols-outlined">close</span></button>
+                    </div>
+                    <form id="sponsorForm" onsubmit="event.preventDefault(); submitSponsorship();">
+                        <input type="hidden" id="sponsorPartnerId">
+                        <div style="margin-bottom: 1rem;">
+                            <label style="display: block; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; color: #64748b; margin-bottom: 8px;">Select Tier</label>
+                            <select id="sponsorTier" class="form-field" style="width: 100%;">
+                                <option value="listed">Listed (Free)</option>
+                                <option value="silver">Silver (25,000 FCFA)</option>
+                                <option value="gold">Gold (50,000 FCFA)</option>
+                            </select>
+                        </div>
+                        <div id="premiumFields" style="display: none;">
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                                <div>
+                                    <label style="display: block; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; color: #64748b; margin-bottom: 8px;">Total Fee (FCFA)</label>
+                                    <input type="number" id="sponsorAmount" class="form-field" style="width: 100%;" placeholder="e.g. 50000">
+                                </div>
+                                <div>
+                                    <label style="display: block; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; color: #64748b; margin-bottom: 8px;">Duration (Months)</label>
+                                    <input type="number" id="sponsorMonths" class="form-field" style="width: 100%;" value="1">
+                                </div>
+                            </div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
+                                <div>
+                                    <label style="display: block; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; color: #64748b; margin-bottom: 8px;">Payment Phone</label>
+                                    <input type="text" id="sponsorPhone" class="form-field" style="width: 100%;" placeholder="+237...">
+                                </div>
+                                <div>
+                                    <label style="display: block; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; color: #64748b; margin-bottom: 8px;">Reference</label>
+                                    <input type="text" id="sponsorRef" class="form-field" style="width: 100%;" placeholder="TXN...">
+                                </div>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn-rs btn-rs-primary" style="width: 100%; justify-content: center; padding: 1rem;">Update Sponsorship</button>
+                    </form>
+                </div>
+            </div>
+ </div>
 
             <!-- ALERTS TAB -->
             <div id="alerts" class="tab-content">
@@ -528,10 +771,68 @@ $all_partners = $db->query("SELECT * FROM partners ORDER BY is_sponsored DESC, n
         // Find triggering button
         const buttons = document.querySelectorAll('.admin-tab-btn');
         buttons.forEach(btn => {
-            if (btn.innerText.toLowerCase().includes(tabId.replace('activity', 'log').replace('verify', 'app').trim())) {
+            if (btn.innerText.toLowerCase().includes(tabId.replace('activity', 'log').replace('reports', 'manage').replace('verify', 'app').trim())) {
                 btn.classList.add('active');
             }
         });
+    }
+
+    function manageRevenue(action, params) {
+        if (!confirm('Confirm revenue action: ' + action + '?')) return;
+        fetch('api/manage_revenue.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: action, ...params })
+        })
+        .then(r => r.json())
+        .then(d => d.success ? location.reload() : alert('Error: ' + d.message));
+    }
+
+    function openSponsorModal(id, name) {
+        document.getElementById('sponsorPartnerId').value = id;
+        document.getElementById('sponsorPartnerName').textContent = name;
+        document.getElementById('sponsorModal').style.display = 'flex';
+    }
+
+    document.getElementById('sponsorTier').addEventListener('change', function() {
+        document.getElementById('premiumFields').style.display = this.value !== 'listed' ? 'block' : 'none';
+        if (this.value === 'gold') document.getElementById('sponsorAmount').value = 50000;
+        else if (this.value === 'silver') document.getElementById('sponsorAmount').value = 25000;
+        else document.getElementById('sponsorAmount').value = 0;
+    });
+
+    function submitSponsorship() {
+        const params = {
+            partner_id: document.getElementById('sponsorPartnerId').value,
+            tier: document.getElementById('sponsorTier').value,
+            amount: document.getElementById('sponsorAmount').value,
+            months: document.getElementById('sponsorMonths').value,
+            payment_phone: document.getElementById('sponsorPhone').value,
+            payment_reference: document.getElementById('sponsorRef').value
+        };
+        manageRevenue('set_partner_tier', params);
+    }
+
+    function openSubscriptionModal(id, name, tier) {
+        document.getElementById('subUserId').value = id;
+        document.getElementById('subName').textContent = name;
+        document.getElementById('subTier').value = tier || 'basic';
+        document.getElementById('subModal').style.display = 'flex';
+    }
+
+    function submitSubscription() {
+        const params = {
+            user_id: document.getElementById('subUserId').value,
+            tier: document.getElementById('subTier').value,
+            expiry: document.getElementById('subExpiry').value
+        };
+        fetch('api/manage_revenue.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'set_authority_subscription', ...params })
+        })
+        .then(r => r.json())
+        .then(d => d.success ? location.reload() : alert('Error: ' + d.message));
     }
 
     function updateStatus(id, newStatus) {

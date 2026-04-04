@@ -50,6 +50,15 @@ if (!function_exists('getCurrentUser')) {
 }
 
 /**
+ * Get the current user's ID
+ */
+if (!function_exists('getCurrentUserId')) {
+    function getCurrentUserId() {
+        return isset($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : null;
+    }
+}
+
+/**
  * Get the current user's role (user, authority, admin)
  */
 if (!function_exists('getUserRole')) {

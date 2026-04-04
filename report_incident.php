@@ -1,5 +1,5 @@
 <?php
-// Redirect to enhanced report incident page with location features
+// Forward to the enhanced report incident page
 header('Location: report_incident_enhanced.php');
 exit;
 ?>
