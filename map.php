@@ -1,17 +1,16 @@
 <?php
-require_once 'includes/header.php';
-require_once 'database/config.php';
+require_once 'includes/auth.php';
 
-// Get recent incidents for map
-$db = new Database();
-$incidents = $db->query("
-    SELECT i.*, u.full_name as reporter_name 
-    FROM incidents i 
-    LEFT JOIN users u ON i.user_id = u.id 
-    WHERE i.latitude IS NOT NULL AND i.longitude IS NOT NULL
-    ORDER BY i.created_at DESC 
-    LIMIT 100
-")->fetchAll();
+// Check if user is logged in
+if (!isLoggedIn()) {
+    header('Location: login.php');
+    exit;
+}
+
+// Map logic has been consolidated into map-functional.php
+header('Location: map-functional.php');
+exit;
+?>
 
 // Convert to JSON for map markers
 $markers = [];
@@ -37,7 +36,11 @@ foreach ($incidents as $incident) {
             <option value="critical">Critical</option>
             <option value="high">High</option>
             <option value="medium">Medium</option>
-            <option value="low">Low</option>
+            <?php
+// Redirect to the functional map
+header('Location: map-functional.php');
+exit;
+?>
         </select>
         
         <select id="typeFilter" class="form-input w-auto">
@@ -108,7 +111,7 @@ foreach ($incidents as $incident) {
         map = L.map('map').setView([3.8480, 11.5021], 11);
         
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '© OpenStreetMap contributors'
+            attribution: ' OpenStreetMap contributors'
         }).addTo(map);
         
         // Add markers

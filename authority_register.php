@@ -1,298 +1,341 @@
 <?php
-require_once 'includes/public_header.php';
-require_once 'includes/mailer.php';
+require_once 'includes/auth.php';
 
-// Redirect if already logged in
-if (isLoggedIn()) {
-    header('Location: dashboard.php');
-    exit;
-}
-
-// Initialize variables for the form
-$errors = [];
-$username = '';
-$email = '';
-$full_name = '';
-$phone = '';
-$organization = '';
-$position = '';
-$badge_number = '';
+$error = '';
 $success = '';
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // CSRF Check
-    if (!verifyCsrfToken($_POST['csrf_token'] ?? '')) {
-        die('CSRF token validation failed.');
-    }
+// Initialize variables for form
+$full_name = '';
+$email = '';
+$username = '';
+$org_name = '';
+$org_type = '';
+$position = '';
+$phone = '';
+$gov_id = '';
+$address = '';
 
-    $username = $_POST['username'] ?? '';
-    $email = $_POST['email'] ?? '';
-    $password = $_POST['password'] ?? '';
-    $confirm_password = $_POST['confirm_password'] ?? '';
-    $full_name = $_POST['full_name'] ?? '';
-    $phone = $_POST['phone'] ?? '';
-    $organization = $_POST['organization'] ?? '';
-    $position = $_POST['position'] ?? '';
-    $badge_number = $_POST['badge_number'] ?? '';
-    
-    // Validation
-    if (empty($username) || empty($email) || empty($password) || empty($full_name) || empty($organization) || empty($position)) {
-        $errors[] = 'All required fields must be filled.';
-    }
-    
-    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        $errors[] = 'Please enter a valid email address.';
-    }
-    
-    if (strlen($password) < 8) {
-        $errors[] = 'Password must be at least 8 characters long.';
-    }
-    
-    if ($password !== $confirm_password) {
-        $errors[] = 'Passwords do not match.';
-    }
-    
-    if (empty($errors)) {
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Verify CSRF Token
+    if (!verifyCsrfToken($_POST['csrf_token'] ?? '')) {
+        $error = 'Security validation failed. Please try again.';
+    } else {
         $db = new Database();
         
-        // Check if email already exists
-        $stmt = $db->query("SELECT id FROM users WHERE email = ?", [$email]);
-        if ($stmt->fetch()) {
-            $errors[] = 'Email address already registered.';
+        // Ensure table exists
+        $db->query("
+            CREATE TABLE IF NOT EXISTS authority_applications (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                user_id INT NOT NULL,
+                organization_name VARCHAR(255) NOT NULL,
+                organization_type ENUM('police', 'medical', 'fire', 'community', 'security', 'other') NOT NULL,
+                contact_person VARCHAR(255) NOT NULL,
+                position VARCHAR(255) NOT NULL,
+                phone VARCHAR(50) NOT NULL,
+                address TEXT NOT NULL,
+                government_id VARCHAR(100) NOT NULL,
+                status ENUM('pending', 'approved', 'rejected') DEFAULT 'pending',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            )
+        ");
+
+        // Extract POST data
+        $full_name = $_POST['full_name'] ?? '';
+        $email = $_POST['email'] ?? '';
+        $username = $_POST['username'] ?? '';
+        $password = $_POST['password'] ?? '';
+        $confirm_password = $_POST['confirm_password'] ?? '';
+        
+        $org_name = $_POST['org_name'] ?? '';
+        $org_type = $_POST['org_type'] ?? '';
+        $position = $_POST['position'] ?? '';
+        $phone = $_POST['phone'] ?? '';
+        $address = $_POST['address'] ?? '';
+        $gov_id = $_POST['gov_id'] ?? '';
+
+        // Basic Validation
+        if (empty($full_name) || empty($email) || empty($password) || empty($org_name) || empty($gov_id)) {
+            $error = 'Please fill in all required fields to complete your application.';
+        } elseif ($password !== $confirm_password) {
+            $error = 'Passwords do not match.';
         } else {
-            // Create new authority user with a verification token
-            $password_hash = password_hash($password, PASSWORD_DEFAULT);
-            $verification_token = bin2hex(random_bytes(32));
-
-            $stmt = $db->query("
-                INSERT INTO users (username, email, password_hash, full_name, phone, role, is_verified, verification_token) 
-                VALUES (?, ?, ?, ?, ?, 'authority', 0, ?)
-            ", [$username, $email, $password_hash, $full_name, $phone, $verification_token]);
-            
-            if ($stmt) {
-                // Send welcome email
-                sendWelcomeEmail($email, $full_name);
-
-                // Send verification email
-                $mail_sent = sendVerificationEmail($email, $full_name, $verification_token);
-                if (!$mail_sent) {
-                    error_log("[Authority Register] Verification email failed for: {$email}");
-                }
-                $_SESSION['pending_verification_email'] = $email;
-                header('Location: authority_register.php?registered=1');
-                exit;
+            // Check if user exists
+            $existing = $db->query("SELECT id FROM users WHERE email = ? OR username = ?", [$email, $username])->fetch();
+            if ($existing) {
+                $error = 'This email or username is already registered.';
             } else {
-                $errors[] = 'Registration failed. Please try again.';
+                $db->beginTransaction();
+                try {
+                    // 1. Create User
+                    $hashed_password = password_hash($password, PASSWORD_DEFAULT);
+                    $db->query("
+                        INSERT INTO users (full_name, email, username, password_hash, phone, role, created_at) 
+                        VALUES (?, ?, ?, ?, ?, 'authority_pending', NOW())
+                    ", [$full_name, $email, $username, $hashed_password, $phone]);
+                    
+                    $user_id = $db->lastInsertId();
+                    
+                    // 2. Create Authority Application
+                    $db->query("
+                        INSERT INTO authority_applications (user_id, organization_name, organization_type, contact_person, position, phone, address, government_id, status) 
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')
+                    ", [$user_id, $org_name, $org_type, $full_name, $position, $phone, $address, $gov_id]);
+                    
+                    $db->commit();
+                    $success = 'Application submitted successfully. Our administrators will review your credentials shortly.';
+                    header('Location: login.php?success=' . urlencode($success));
+                    exit;
+                } catch (Exception $e) {
+                    $db->rollback();
+                    $error = 'Application failed: ' . $e->getMessage();
+                }
             }
         }
     }
 }
-$just_registered = isset($_GET['registered']) && $_GET['registered'] == '1';
-$pending_email = $_SESSION['pending_verification_email'] ?? '';
-unset($_SESSION['pending_verification_email']);
 ?>
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Authority Registration | Sentinel Cameroon</title>
-    <link rel="stylesheet" href="assets/css/main.css">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Public+Sans:wght@600;700;800;900&display=swap" rel="stylesheet">
+    <title>Sentinel | Official Registration</title>
+    <link rel="stylesheet" href="assets/css/resilient-sentinel.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Public+Sans:wght@700;800;900&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+    
+    <style>
+        body { background: white; overflow-x: hidden; }
+        .auth-split { display: flex; min-height: 100vh; width: 100%; }
+        
+        .auth-branding {
+            flex: 0.7;
+            background: linear-gradient(135deg, var(--rs-primary) 0%, #020617 100%);
+            color: white;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            padding: 4rem;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .auth-form-side {
+            flex: 1.3;
+            background: white;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            padding: 4rem;
+            overflow-y: auto;
+        }
+
+        .auth-input {
+            width: 100%;
+            padding: 1.1rem;
+            border-radius: 10px;
+            border: 1px solid var(--rs-border);
+            background: var(--rs-bg);
+            font-weight: 700;
+            font-size: 0.95rem;
+            transition: var(--rs-transition);
+            margin-bottom: 1rem;
+        }
+        
+        .auth-input:focus {
+            border-color: var(--rs-secondary);
+            background: white;
+            outline: none;
+            box-shadow: 0 0 0 4px rgba(249, 115, 22, 0.1);
+        }
+
+        .auth-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
+
+        .sub-heading {
+            font-size: 0.8rem;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--rs-secondary);
+            margin: 2rem 0 1rem;
+            display: flex;
+            align-items: center; gap: 10px;
+        }
+        
+        .sub-heading:first-child { margin-top: 0; }
+
+        @media (max-width: 1024px) {
+            .auth-branding {
+                display: none;
+            }
+            .auth-form-side {
+                flex: 1;
+                padding: 3rem 1.5rem;
+                min-height: 100vh;
+                justify-content: flex-start;
+            }
+            .auth-grid {
+                grid-template-columns: 1fr;
+                gap: 1rem;
+            }
+            .auth-input {
+                padding: 1rem;
+            }
+            h2 { font-size: 1.75rem !important; }
+        }
+
+        /* Mobile Header */
+        .mobile-auth-header {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 2rem;
+            gap: 12px;
+        }
+
+        @media (max-width: 1024px) {
+            .mobile-auth-header {
+                display: flex;
+            }
+        }
+    </style>
 </head>
-<body class="bg-surface">
-    <div class="min-h-screen flex items-center justify-center py-8">
-        <div class="w-full max-w-2xl">
-            <div class="card">
+<body class="animate-rs">
 
-                <?php if ($just_registered): ?>
-                <div class="text-center">
-                    <span class="material-symbols-outlined" style="font-size:72px;color:#1a73e8;font-variation-settings:'FILL' 1;">mark_email_unread</span>
-                    <h1 class="text-2xl font-bold text-primary mt-4 mb-2">Check Your Inbox!</h1>
-                    <p class="text-gray-600 mb-6">
-                        We sent a verification link to
-                        <?php if ($pending_email): ?>
-                            <strong><?php echo htmlspecialchars($pending_email); ?></strong>.
-                        <?php else: ?>
-                            your email address.
-                        <?php endif; ?>
-                        Verify your email to activate your authority account — it will then be reviewed by our team.
-                    </p>
-                    <p class="text-sm text-gray-500 mb-6">Didn't get it? Check your spam folder.</p>
-                    <a href="login.php" class="btn btn-primary">Go to Sign In</a>
-                </div>
-                <?php else: ?>
-
-                <div class="text-center mb-8">
-                    <h1 class="text-3xl font-bold text-primary mb-2">Authority Registration</h1>
-                    <p class="text-gray-600">Register for emergency response and incident management access</p>
+    <div class="auth-split">
+        <!-- Branding Side -->
+        <div class="auth-branding">
+            <div style="position: relative; z-index: 5;">
+                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 2rem;">
+                    <span class="material-symbols-outlined" style="background: var(--rs-secondary); color: white; padding: 10px; border-radius: 10px; font-size: 1.5rem;">shield_person</span>
+                    <h2 style="font-size: 1.5rem; color: white;">Sentinel Authority</h2>
                 </div>
                 
-                <?php if (!empty($errors)): ?>
-                    <div class="alert alert-error">
-                        <?php foreach ($errors as $error): ?>
-                            <p><?php echo htmlspecialchars($error); ?></p>
-                        <?php endforeach; ?>
+                <h1 style="font-size: 3rem; color: white; line-height: 1.1; margin-bottom: 2rem;">Official Agency <br>Registration.</h1>
+                <p style="font-size: 1.1rem; color: #94a3b8; line-height: 1.6; max-width: 400px; margin-bottom: 4rem;">Secure access for law enforcement, emergency services, and community responders.</p>
+                
+                <div style="display: flex; flex-direction: column; gap: 2rem;">
+                    <div style="display: flex; gap: 15px;">
+                        <span class="material-symbols-outlined" style="color: var(--rs-secondary);">verified</span>
+                        <div>
+                            <div style="font-weight: 800; font-size: 0.95rem;">Verified Status</div>
+                            <div style="color: #64748b; font-size: 0.85rem;">Every official account is manually verified for security.</div>
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 15px;">
+                        <span class="material-symbols-outlined" style="color: var(--rs-secondary);">admin_panel_settings</span>
+                        <div>
+                            <div style="font-weight: 800; font-size: 0.95rem;">Command Center</div>
+                            <div style="color: #64748b; font-size: 0.85rem;">Access high-level report management and broadcasting tools.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div style="margin-top: auto; font-size: 0.8rem; color: #475569; font-weight: 600;">
+                © 2024 Sentinel Authority Onboarding.
+            </div>
+        </div>
+
+        <!-- Form Side -->
+        <div class="auth-form-side">
+            <div style="max-width: 650px; width: 100%; margin: 0 auto;">
+                
+                <!-- Mobile Branding -->
+                <div class="mobile-auth-header">
+                    <span class="material-symbols-outlined"
+                        style="background: var(--rs-secondary); color: white; padding: 10px; border-radius: 10px; font-size: 1.5rem;">shield_person</span>
+                    <h2 style="font-size: 1.25rem; font-weight: 900; color: var(--rs-primary);">Sentinel Authority</h2>
+                </div>
+
+                <h2 style="font-size: 2.25rem; margin-bottom: 8px;">Create Official Account</h2>
+                <p style="color: #64748b; font-weight: 600; margin-bottom: 2rem;">Please provide your agency information for review.</p>
+                
+                <?php if ($error): ?>
+                    <div style="background: #fee2e2; color: #ef4444; padding: 1rem; border-radius: 10px; font-weight: 700; font-size: 0.85rem; margin-bottom: 2rem; border: 1px solid #fecaca; display: flex; align-items: center; gap: 8px;">
+                        <span class="material-symbols-outlined">error</span>
+                        <?php echo $error; ?>
                     </div>
                 <?php endif; ?>
                 
-                <form method="POST" action="authority_register.php" class="space-y-6">
+                <form method="POST">
                     <?php csrfInput(); ?>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div class="form-group">
-                            <label for="full_name" class="form-label">Full Name *</label>
-                            <input 
-                                type="text" 
-                                id="full_name" 
-                                name="full_name" 
-                                class="form-input" 
-                                required
-                                value="<?php echo htmlspecialchars($full_name); ?>"
-                                placeholder="Enter your full name"
-                            >
+                    <div class="sub-heading">Representative Details</div>
+                    <div class="auth-grid">
+                        <div style="grid-column: span 2;">
+                            <label style="display: block; font-size: 0.7rem; font-weight: 800; text-transform: uppercase; color: #94a3b8; margin-bottom: 8px;">Full Name</label>
+                            <input type="text" name="full_name" class="auth-input" placeholder="e.g. Commandant Jean Pierre" required autofocus value="<?php echo htmlspecialchars($full_name); ?>">
                         </div>
-                        
-                        <div class="form-group">
-                            <label for="email" class="form-label">Email Address *</label>
-                            <input 
-                                type="email" 
-                                id="email" 
-                                name="email" 
-                                class="form-input" 
-                                required
-                                value="<?php echo htmlspecialchars($email); ?>"
-                                placeholder="Enter your official email"
-                            >
+                        <div>
+                            <label style="display: block; font-size: 0.7rem; font-weight: 800; text-transform: uppercase; color: #94a3b8; margin-bottom: 8px;">Official Email</label>
+                            <input type="email" name="email" class="auth-input" placeholder="official@agency.cm" required value="<?php echo htmlspecialchars($email); ?>">
+                        </div>
+                        <div>
+                            <label style="display: block; font-size: 0.7rem; font-weight: 800; text-transform: uppercase; color: #94a3b8; margin-bottom: 8px;">Desired Username</label>
+                            <input type="text" name="username" class="auth-input" placeholder="e.g. DLA_POLICE_01" required value="<?php echo htmlspecialchars($username); ?>">
+                        </div>
+                        <div>
+                            <label style="display: block; font-size: 0.7rem; font-weight: 800; text-transform: uppercase; color: #94a3b8; margin-bottom: 8px;">Password</label>
+                            <input type="password" name="password" class="auth-input" placeholder="••••••••" required>
+                        </div>
+                        <div>
+                            <label style="display: block; font-size: 0.7rem; font-weight: 800; text-transform: uppercase; color: #94a3b8; margin-bottom: 8px;">Confirm Password</label>
+                            <input type="password" name="confirm_password" class="auth-input" placeholder="••••••••" required>
                         </div>
                     </div>
                     
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div class="form-group">
-                            <label for="username" class="form-label">Username *</label>
-                            <input 
-                                type="text" 
-                                id="username" 
-                                name="username" 
-                                class="form-input" 
-                                required
-                                value="<?php echo htmlspecialchars($username); ?>"
-                                placeholder="Choose a username"
-                            >
+                    <div class="sub-heading">Agency Information</div>
+                    <div class="auth-grid">
+                        <div style="grid-column: span 2;">
+                            <label style="display: block; font-size: 0.7rem; font-weight: 800; text-transform: uppercase; color: #94a3b8; margin-bottom: 8px;">Agency / Organization Name</label>
+                            <input type="text" name="org_name" class="auth-input" placeholder="Full Official Organization Name" required value="<?php echo htmlspecialchars($org_name); ?>">
                         </div>
-                        
-                        <div class="form-group">
-                            <label for="phone" class="form-label">Phone Number</label>
-                            <input 
-                                type="tel" 
-                                id="phone" 
-                                name="phone" 
-                                class="form-input"
-                                value="<?php echo htmlspecialchars($phone); ?>"
-                                placeholder="+237 XXX XXX XXX"
-                            >
+                        <div>
+                            <label style="display: block; font-size: 0.7rem; font-weight: 800; text-transform: uppercase; color: #94a3b8; margin-bottom: 8px;">Agency Type</label>
+                            <select name="org_type" class="auth-input" required>
+                                <option value="police" <?php echo ($org_type === 'police' ? 'selected' : ''); ?>>Police / Law Enforcement</option>
+                                <option value="medical" <?php echo ($org_type === 'medical' ? 'selected' : ''); ?>>Medical / Hospital</option>
+                                <option value="fire" <?php echo ($org_type === 'fire' ? 'selected' : ''); ?>>Fire Department</option>
+                                <option value="security" <?php echo ($org_type === 'security' ? 'selected' : ''); ?>>Private Security</option>
+                                <option value="community" <?php echo ($org_type === 'community' ? 'selected' : ''); ?>>Community Watch</option>
+                            </select>
                         </div>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="organization" class="form-label">Organization *</label>
-                        <input 
-                            type="text" 
-                                id="organization" 
-                                name="organization" 
-                                class="form-input" 
-                                required
-                                value="<?php echo htmlspecialchars($organization); ?>"
-                            placeholder="e.g., Cameroon National Police"
-                        >
-                    </div>
-                    
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div class="form-group">
-                            <label for="position" class="form-label">Position *</label>
-                            <input 
-                                type="text" 
-                                id="position" 
-                                name="position" 
-                                class="form-input" 
-                                required
-                                value="<?php echo htmlspecialchars($position); ?>"
-                                placeholder="e.g., Emergency Response Officer"
-                            >
+                        <div>
+                            <label style="display: block; font-size: 0.7rem; font-weight: 800; text-transform: uppercase; color: #94a3b8; margin-bottom: 8px;">Rank / Position</label>
+                            <input type="text" name="position" class="auth-input" placeholder="Your role in the agency" required value="<?php echo htmlspecialchars($position); ?>">
                         </div>
-                        
-                        <div class="form-group">
-                            <label for="badge_number" class="form-label">Badge Number</label>
-                            <input 
-                                type="text" 
-                                id="badge_number" 
-                                name="badge_number" 
-                                class="form-input"
-                                value="<?php echo htmlspecialchars($badge_number); ?>"
-                                placeholder="Official badge number"
-                            >
+                        <div>
+                            <label style="display: block; font-size: 0.7rem; font-weight: 800; text-transform: uppercase; color: #94a3b8; margin-bottom: 8px;">Official Phone</label>
+                            <input type="tel" name="phone" class="auth-input" placeholder="Contact number" required value="<?php echo htmlspecialchars($phone); ?>">
+                        </div>
+                        <div>
+                            <label style="display: block; font-size: 0.7rem; font-weight: 800; text-transform: uppercase; color: #94a3b8; margin-bottom: 8px;">Official Government ID</label>
+                            <input type="text" name="gov_id" class="auth-input" placeholder="Registration # / ID Number" required value="<?php echo htmlspecialchars($gov_id); ?>">
+                        </div>
+                        <div style="grid-column: span 2;">
+                            <label style="display: block; font-size: 0.7rem; font-weight: 800; text-transform: uppercase; color: #94a3b8; margin-bottom: 8px;">Official Address</label>
+                            <input type="text" name="address" class="auth-input" placeholder="Headquarters location" required value="<?php echo htmlspecialchars($address); ?>">
                         </div>
                     </div>
                     
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div class="form-group">
-                            <label for="password" class="form-label">Password *</label>
-                            <input 
-                                type="password" 
-                                id="password" 
-                                name="password" 
-                                class="form-input" 
-                                required
-                                placeholder="Create a strong password"
-                            >
-                        </div>
-                        
-                        <div class="form-group">
-                            <label for="confirm_password" class="form-label">Confirm Password *</label>
-                            <input 
-                                type="password" 
-                                id="confirm_password" 
-                                name="confirm_password" 
-                                class="form-input" 
-                                required
-                                placeholder="Confirm your password"
-                            >
-                        </div>
-                    </div>
+                    <button type="submit" class="btn-rs btn-rs-primary" style="width: 100%; justify-content: center; padding: 1.25rem; font-size: 1.1rem; border-radius: 12px; margin-top: 2rem;">
+                        Submit Application
+                    </button>
                     
-                    <div class="bg-surface-container-low p-4 rounded-lg">
-                        <h4 class="font-bold mb-2">Authority Account Information</h4>
-                        <ul class="text-sm text-gray-600 space-y-1">
-                            <li>• Authority accounts require verification before full access</li>
-                            <li>• You'll be able to verify incidents and update status</li>
-                            <li>• Access to admin dashboard and incident management tools</li>
-                            <li>• Ability to broadcast alerts to specific geographic areas</li>
-                            <li>• Priority support for emergency response coordination</li>
-                        </ul>
-                    </div>
-                    
-                    <div class="flex gap-4">
-                        <button type="submit" class="btn btn-primary">
-                            <span class="material-symbols-outlined">security</span>
-                            Submit for Review
-                        </button>
-                        <a href="index.php" class="btn btn-outline">Cancel</a>
+                    <div style="text-align: center; margin-top: 2rem; font-size: 0.9rem; color: #64748b; font-weight: 600;">
+                        Already registered? <a href="login.php" style="color: var(--rs-primary); font-weight: 800;">Sign In Here</a>
+                        <div style="margin-top: 1.5rem;">
+                            <a href="index.php" style="display: inline-flex; align-items: center; gap: 5px; color: #94a3b8; text-decoration: none;">
+                                <span class="material-symbols-outlined">arrow_back</span>
+                                Return to Homepage
+                            </a>
+                        </div>
                     </div>
                 </form>
-                
-                <div class="text-center mt-6">
-                    <p class="text-sm text-gray-600">
-                        Already have an account? 
-                        <a href="login.php" class="text-primary hover:underline font-medium">Sign in</a>
-                    </p>
-                </div>
-
-                <?php endif; // end just_registered ?>
             </div>
         </div>
     </div>
+
 </body>
 </html>

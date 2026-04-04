@@ -1,6 +1,13 @@
 <?php
+require_once 'includes/auth.php';
+
+// Check if user is logged in
+if (!isLoggedIn()) {
+    header('Location: login.php');
+    exit;
+}
+
 require_once 'includes/header.php';
-require_once 'database/config.php';
 
 // Get incident ID from URL
 $incident_id = $_GET['id'] ?? 0;
@@ -14,7 +21,7 @@ $db = new Database();
 
 // Get incident details
 $incident = $db->query("
-    SELECT i.*, u.full_name as reporter_name, u.email as reporter_email 
+    SELECT i.*, u.full_name as reporter_name, u.email as reporter_email, u.profile_picture as reporter_picture 
     FROM incidents i 
     LEFT JOIN users u ON i.user_id = u.id 
     WHERE i.id = ?
@@ -87,7 +94,22 @@ $attachments = $db->query("
                     <?php endif; ?>
                     <div>
                         <span class="text-gray-500">Reported by:</span>
-                        <span class="font-medium ml-2"><?php echo $incident['is_anonymous'] ? 'Anonymous' : htmlspecialchars($incident['reporter_name']); ?></span>
+                        <?php if ($incident['is_anonymous']): ?>
+                            <span class="font-medium ml-2">Anonymous</span>
+                        <?php else: ?>
+                            <div class="flex items-center space-x-2 ml-2">
+                                <?php if (!empty($incident['reporter_picture'])): ?>
+                                    <img src="<?php echo htmlspecialchars($incident['reporter_picture']); ?>" 
+                                         alt="<?php echo htmlspecialchars($incident['reporter_name']); ?>" 
+                                         class="profile-picture-preview">
+                                <?php else: ?>
+                                    <div class="profile-icon-header">
+                                        <span class="material-symbols-outlined text-white text-sm">person</span>
+                                    </div>
+                                <?php endif; ?>
+                                <span class="font-medium"><?php echo htmlspecialchars($incident['reporter_name']); ?></span>
+                            </div>
+                        <?php endif; ?>
                     </div>
                 </div>
             </div>
@@ -210,7 +232,6 @@ $attachments = $db->query("
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': '<?php echo generateCsrfToken(); ?>'
                 },
                 body: JSON.stringify({
                     incident_id: incidentId,
@@ -233,5 +254,13 @@ $attachments = $db->query("
     }
 </script>
 <?php endif; ?>
+
+<?php require_once 'includes/footer.php'; ?>
+                }).addTo(map);
+            }, 500);
+        };
+        document.head.appendChild(script);
+    }
+</script>
 
 <?php require_once 'includes/footer.php'; ?>

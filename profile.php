@@ -1,18 +1,22 @@
 <?php
-require_once 'includes/header.php';
-require_once 'database/config.php';
+require_once 'includes/auth.php';
 
-// Get current user
+// Check if user is logged in
+if (!isLoggedIn()) {
+    header('Location: login.php');
+    exit;
+}
+
+require_once 'includes/header.php';
+
 $user = getCurrentUser();
 $success = '';
 $errors = [];
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // CSRF Check
-    if (!verifyCsrfToken($_POST['csrf_token'] ?? '')) {
-        die('CSRF token validation failed.');
-    }
+// Handle success message from URL
+if (isset($_GET['success'])) { $success = $_GET['success']; }
 
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $full_name = $_POST['full_name'] ?? '';
     $phone = $_POST['phone'] ?? '';
     $email = $_POST['email'] ?? '';
@@ -20,253 +24,195 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $new_password = $_POST['new_password'] ?? '';
     $confirm_password = $_POST['confirm_password'] ?? '';
     
-    // Validation
-    if (empty($full_name) || empty($email)) {
-        $errors[] = 'Name and email are required.';
-    }
-    
-    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        $errors[] = 'Please enter a valid email address.';
-    }
-    
-    // If changing password
-    if (!empty($new_password)) {
-        if (empty($current_password)) {
-            $errors[] = 'Current password is required to change password.';
-        } elseif (strlen($new_password) < 8) {
-            $errors[] = 'New password must be at least 8 characters long.';
-        } elseif ($new_password !== $confirm_password) {
-            $errors[] = 'New passwords do not match.';
+    // Handle profile picture upload
+    $profile_picture = $user['profile_picture'] ?? ''; 
+    if (isset($_FILES['profile_picture']) && $_FILES['profile_picture']['error'] === UPLOAD_ERR_OK) {
+        $file = $_FILES['profile_picture'];
+        $allowed_types = ['image/jpeg', 'image/png', 'image/gif'];
+        $max_size = 2 * 1024 * 1024; 
+        
+        $file_type = mime_content_type($file['tmp_name']);
+        if (!in_array($file_type, $allowed_types)) { $errors[] = 'Image must be JPG, PNG, or GIF.'; }
+        if ($file['size'] > $max_size) { $errors[] = 'Image must be less than 2MB.'; }
+        
+        if (empty($errors)) {
+            $upload_dir = 'uploads/profiles/';
+            if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
+            $filename = uniqid('profile_', true) . '.' . pathinfo($file['name'], PATHINFO_EXTENSION);
+            $filepath = $upload_dir . $filename;
+            if (move_uploaded_file($file['tmp_name'], $filepath)) {
+                if ($user['profile_picture'] && file_exists($user['profile_picture'])) unlink($user['profile_picture']);
+                $profile_picture = $filepath;
+            } else { $errors[] = 'Failed to upload image.'; }
         }
+    }
+    
+    if (empty($full_name) || empty($email)) $errors[] = 'Name and email are required.';
+    
+    if (!empty($new_password)) {
+        if (empty($current_password)) $errors[] = 'Current password is required to change it.';
+        elseif (!password_verify($current_password, $user['password_hash'])) $errors[] = 'Incorrect current password.';
+        elseif (strlen($new_password) < 8) $errors[] = 'New password must be at least 8 characters.';
+        elseif ($new_password !== $confirm_password) $errors[] = 'Passwords do not match.';
     }
     
     if (empty($errors)) {
         $db = new Database();
-        
-        // Check if new email already exists (and is different from current)
         if ($email !== $user['email']) {
             $stmt = $db->query("SELECT id FROM users WHERE email = ? AND id != ?", [$email, $user['id']]);
-            if ($stmt->fetch()) {
-                $errors[] = 'Email address already registered by another user.';
-            }
+            if ($stmt->fetch()) $errors[] = 'Email already in use.';
         }
         
         if (empty($errors)) {
-            // Update user info
-            $update_fields = "full_name = ?, email = ?, phone = ?";
-            $update_params = [$full_name, $email, $phone];
+            $q = "UPDATE users SET full_name = ?, email = ?, phone = ?, profile_picture = ?" . (!empty($new_password) ? ", password_hash = ?" : "") . " WHERE id = ?";
+            $p = [$full_name, $email, $phone, $profile_picture];
+            if (!empty($new_password)) $p[] = password_hash($new_password, PASSWORD_DEFAULT);
+            $p[] = $user['id'];
             
-            // Add password update if provided
-            if (!empty($new_password)) {
-                $update_fields .= ", password_hash = ?";
-                $update_params[] = password_hash($new_password, PASSWORD_DEFAULT);
-            }
-            
-            $update_fields .= " WHERE id = ?";
-            $update_params[] = $user['id'];
-            
-            $stmt = $db->query("UPDATE users SET $update_fields", $update_params);
-            
-            if ($stmt) {
-                $success = 'Profile updated successfully!';
-                // Refresh user data
-                $user = getCurrentUser();
-            } else {
-                $errors[] = 'Failed to update profile. Please try again.';
-            }
+            if ($db->query($q, $p)) {
+                header('Location: profile.php?success=' . urlencode('Profile updated successfully!'));
+                exit;
+            } else { $errors[] = 'Failed to save changes.'; }
         }
     }
 }
+
+$db = new Database();
+$stats = [
+    'reported' => $db->query("SELECT COUNT(*) as count FROM incidents WHERE user_id = ?", [$user['id']])->fetch()['count'],
+    'resolved' => $db->query("SELECT COUNT(*) as count FROM incidents WHERE user_id = ? AND status = 'resolved'", [$user['id']])->fetch()['count'],
+    'account_age' => floor((time() - strtotime($user['created_at'])) / 86400)
+];
 ?>
 
-<div class="max-w-2xl mx-auto">
-    <div class="flex justify-between items-center mb-6">
-        <h1 class="text-2xl font-bold">My Profile</h1>
-        <span class="text-sm text-gray-600">
-            Member since: <?php echo date('F j, Y', strtotime($user['created_at'])); ?>
-        </span>
-    </div>
+<div class="animate-rs">
     
+    <!-- Header -->
+    <div class="rs-card" style="margin-bottom: 2rem; border-left: 6px solid var(--rs-accent); border-radius: 12px;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <h1 style="font-size: 2.25rem; margin-bottom: 5px;">My Account Settings</h1>
+                <p style="color: #64748b; font-weight: 600;">Update your personal details and manage your security.</p>
+            </div>
+            <div style="text-align: right;">
+                <div style="display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 0.85rem; color: <?php echo $user['is_verified'] ? 'var(--rs-success)' : 'var(--rs-warning)'; ?>;">
+                    <span class="material-symbols-outlined" style="font-size: 1.25rem;"><?php echo $user['is_verified'] ? 'verified' : 'pending_actions'; ?></span>
+                    <?php echo $user['is_verified'] ? 'VERIFIED ACCOUNT' : 'UNVERIFIED'; ?>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <?php if ($success): ?>
-        <div class="alert alert-success">
+        <div class="rs-card animate-rs" style="background: #dcfce7; border-color: #86efac; color: #166534; padding: 1.25rem; margin-bottom: 2rem; font-weight: 700;">
+            <span class="material-symbols-outlined" style="vertical-align: middle; margin-right: 10px;">check_circle</span>
             <?php echo htmlspecialchars($success); ?>
         </div>
     <?php endif; ?>
-    
+
     <?php if (!empty($errors)): ?>
-        <div class="alert alert-error">
+        <div class="rs-card animate-rs" style="background: #fee2e2; border-color: #fecaca; color: #991b1b; padding: 1.25rem; margin-bottom: 2rem;">
             <?php foreach ($errors as $error): ?>
-                <p><?php echo htmlspecialchars($error); ?></p>
+                <div style="display: flex; align-items: center; gap: 10px; font-weight: 700; margin-bottom: 5px;">
+                    <span class="material-symbols-outlined" style="font-size: 1.1rem;">error</span>
+                    <?php echo htmlspecialchars($error); ?>
+                </div>
             <?php endforeach; ?>
         </div>
     <?php endif; ?>
-    
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <!-- Profile Overview -->
-        <div class="md:col-span-1">
-            <div class="card text-center">
-                <div class="w-20 h-20 bg-primary rounded-full mx-auto mb-4 flex items-center justify-center">
-                    <span class="material-symbols-outlined text-white text-3xl">person</span>
-                </div>
-                <h2 class="font-bold text-lg mb-2"><?php echo htmlspecialchars($user['full_name']); ?></h2>
-                <p class="text-sm text-gray-600 mb-4"><?php echo htmlspecialchars($user['email']); ?></p>
-                
-                <div class="space-y-2 text-sm">
-                    <div class="flex justify-between">
-                        <span class="text-gray-500">Role:</span>
-                        <span class="font-medium"><?php echo ucfirst($user['role']); ?></span>
+
+    <div class="rs-grid rs-grid-main">
+        <!-- Sidebar: Profile Overview -->
+        <div class="rs-card" style="display: flex; flex-direction: column; align-items: center; text-align: center;">
+            <div style="position: relative; margin-bottom: 2rem;">
+                <?php if (!empty($user['profile_picture'])): ?>
+                    <img src="<?php echo htmlspecialchars($user['profile_picture']); ?>" style="width: 150px; height: 150px; border-radius: 20px; object-fit: cover; border: 4px solid var(--rs-bg);">
+                <?php else: ?>
+                    <div style="width: 150px; height: 150px; border-radius: 20px; background: var(--rs-bg); display: flex; align-items: center; justify-content: center; color: #cbd5e1;">
+                        <span class="material-symbols-outlined" style="font-size: 5rem;">person</span>
                     </div>
-                    <div class="flex justify-between">
-                        <span class="text-gray-500">Status:</span>
-                        <span class="<?php echo $user['is_verified'] ? 'text-success' : 'text-warning'; ?> font-medium">
-                            <?php echo $user['is_verified'] ? 'Verified' : 'Pending Verification'; ?>
-                        </span>
-                    </div>
-                    <?php if ($user['phone']): ?>
-                        <div class="flex justify-between">
-                            <span class="text-gray-500">Phone:</span>
-                            <span class="font-medium"><?php echo htmlspecialchars($user['phone']); ?></span>
-                        </div>
-                    <?php endif; ?>
+                <?php endif; ?>
+                <div style="position: absolute; bottom: -10px; right: -10px; background: var(--rs-secondary); color: white; padding: 6px; border-radius: 8px; border: 3px solid white;">
+                    <span class="material-symbols-outlined" style="font-size: 1.1rem;">shield</span>
                 </div>
             </div>
-        </div>
-        
-        <!-- Edit Profile Form -->
-        <div class="md:col-span-2">
-            <div class="card">
-                <div class="card-header">
-                    <h3>Edit Profile Information</h3>
+            
+            <h2 style="font-size: 1.5rem; margin-bottom: 5px;"><?php echo htmlspecialchars($user['full_name']); ?></h2>
+            <p style="color: #64748b; font-weight: 700; font-size: 0.75rem; text-transform: uppercase; margin-bottom: 2rem;"><?php echo ucfirst($user['role']); ?></p>
+
+            <div style="width: 100%; display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 2rem;">
+                <div style="background: var(--rs-bg); padding: 1rem; border-radius: 12px;">
+                    <div style="font-size: 1.5rem; font-weight: 900;"><?php echo $stats['reported']; ?></div>
+                    <p style="font-size: 0.6rem; font-weight: 800; color: #94a3b8; text-transform: uppercase;">Reports</p>
                 </div>
-                
-                <form method="POST" class="space-y-6">
-                    <?php csrfInput(); ?>
-                    <div class="grid grid-cols-2 gap-4">
-                        <div class="form-group">
-                            <label for="full_name" class="form-label">Full Name</label>
-                            <input 
-                                type="text" 
-                                id="full_name" 
-                                name="full_name" 
-                                class="form-input" 
-                                required
-                                value="<?php echo htmlspecialchars($user['full_name']); ?>"
-                            >
-                        </div>
-                        
-                        <div class="form-group">
-                            <label for="email" class="form-label">Email Address</label>
-                            <input 
-                                type="email" 
-                                id="email" 
-                                name="email" 
-                                class="form-input" 
-                                required
-                                value="<?php echo htmlspecialchars($user['email']); ?>"
-                            >
-                        </div>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="phone" class="form-label">Phone Number</label>
-                        <input 
-                            type="tel" 
-                            id="phone" 
-                            name="phone" 
-                            class="form-input"
-                            value="<?php echo htmlspecialchars($user['phone'] ?? ''); ?>"
-                            placeholder="+237 XXX XXX XXX"
-                        >
-                    </div>
-                    
-                    <div class="border-t border-surface-container-low pt-6">
-                        <h4 class="font-medium mb-4">Change Password</h4>
-                        <p class="text-sm text-gray-600 mb-4">Leave blank if you don't want to change password</p>
-                        
-                        <div class="form-group">
-                            <label for="current_password" class="form-label">Current Password</label>
-                            <input 
-                                type="password" 
-                                id="current_password" 
-                                name="current_password" 
-                                class="form-input"
-                                placeholder="Enter current password"
-                            >
-                        </div>
-                        
-                        <div class="grid grid-cols-2 gap-4">
-                            <div class="form-group">
-                                <label for="new_password" class="form-label">New Password</label>
-                                <input 
-                                    type="password" 
-                                    id="new_password" 
-                                    name="new_password" 
-                                    class="form-input"
-                                    placeholder="Enter new password"
-                                >
-                            </div>
-                            
-                            <div class="form-group">
-                                <label for="confirm_password" class="form-label">Confirm New Password</label>
-                                <input 
-                                    type="password" 
-                                    id="confirm_password" 
-                                    name="confirm_password" 
-                                    class="form-input"
-                                    placeholder="Confirm new password"
-                                >
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="flex gap-4">
-                        <button type="submit" class="btn btn-primary">
-                            <span class="material-symbols-outlined">save</span>
-                            Save Changes
-                        </button>
-                        <a href="dashboard.php" class="btn btn-outline">Cancel</a>
-                    </div>
-                </form>
+                <div style="background: var(--rs-bg); padding: 1rem; border-radius: 12px;">
+                    <div style="font-size: 1.5rem; font-weight: 900; color: var(--rs-success);"><?php echo $stats['resolved']; ?></div>
+                    <p style="font-size: 0.6rem; font-weight: 800; color: #94a3b8; text-transform: uppercase;">Resolved</p>
+                </div>
             </div>
+            <p style="font-size: 0.8rem; color: #94a3b8; font-weight: 600;">Member for <?php echo $stats['account_age']; ?> days</p>
         </div>
-    </div>
-    
-    <!-- User Statistics -->
-    <div class="card mt-6">
-        <div class="card-header">
-            <h3>My Activity</h3>
-        </div>
-        
-        <div class="grid grid-cols-4 gap-4 text-center">
-            <?php
-            $db = new Database();
-            $stats = [
-                'incidents_reported' => $db->query("SELECT COUNT(*) as count FROM incidents WHERE user_id = ?", [$user['id']])->fetch()['count'],
-                'incidents_resolved' => $db->query("SELECT COUNT(*) as count FROM incidents WHERE user_id = ? AND status = 'resolved'", [$user['id']])->fetch()['count'],
-                'reports_this_month' => $db->query("SELECT COUNT(*) as count FROM incidents WHERE user_id = ? AND MONTH(created_at) = MONTH(CURRENT_DATE()) AND YEAR(created_at) = YEAR(CURRENT_DATE())", [$user['id']])->fetch()['count'],
-                'account_age' => floor((time() - strtotime($user['created_at'])) / (60 * 60 * 24))
-            ];
-            ?>
+
+        <!-- Main Settings Form -->
+        <div class="rs-card">
+            <h3 style="margin-bottom: 2rem; display: flex; align-items: center; gap: 12px;">
+                <span class="material-symbols-outlined" style="color: var(--rs-accent);">manage_accounts</span>
+                Profile Details
+            </h3>
             
-            <div class="bg-surface-container-low rounded-lg p-4">
-                <div class="text-2xl font-bold text-primary"><?php echo $stats['incidents_reported']; ?></div>
-                <div class="text-sm text-gray-600">Incidents Reported</div>
-            </div>
-            
-            <div class="bg-surface-container-low rounded-lg p-4">
-                <div class="text-2xl font-bold text-success"><?php echo $stats['incidents_resolved']; ?></div>
-                <div class="text-sm text-gray-600">Resolved Cases</div>
-            </div>
-            
-            <div class="bg-surface-container-low rounded-lg p-4">
-                <div class="text-2xl font-bold text-warning"><?php echo $stats['reports_this_month']; ?></div>
-                <div class="text-sm text-gray-600">This Month</div>
-            </div>
-            
-            <div class="bg-surface-container-low rounded-lg p-4">
-                <div class="text-2xl font-bold text-secondary"><?php echo $stats['account_age']; ?></div>
-                <div class="text-sm text-gray-600">Days Active</div>
-            </div>
+            <form method="POST" enctype="multipart/form-data">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem;">
+                    <div>
+                        <label style="display: block; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; color: #64748b; margin-bottom: 8px;">Full Name</label>
+                        <input type="text" name="full_name" value="<?php echo htmlspecialchars($user['full_name']); ?>" style="width: 100%; padding: 1rem; border-radius: 10px; border: 1px solid #e2e8f0; font-weight: 700;" required>
+                    </div>
+                    <div>
+                        <label style="display: block; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; color: #64748b; margin-bottom: 8px;">Email Address</label>
+                        <input type="email" name="email" value="<?php echo htmlspecialchars($user['email']); ?>" style="width: 100%; padding: 1rem; border-radius: 10px; border: 1px solid #e2e8f0; font-weight: 700;" required>
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 1.5rem;">
+                    <label style="display: block; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; color: #64748b; margin-bottom: 8px;">Phone Number</label>
+                    <input type="tel" name="phone" value="<?php echo htmlspecialchars($user['phone'] ?? ''); ?>" style="width: 100%; padding: 1rem; border-radius: 10px; border: 1px solid #e2e8f0; font-weight: 700;" placeholder="+237...">
+                </div>
+
+                <div style="margin-bottom: 2rem;">
+                    <label style="display: block; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; color: #64748b; margin-bottom: 8px;">Update Profile Photo</label>
+                    <input type="file" name="profile_picture" accept="image/*" style="width: 100%; padding: 1rem; border-radius: 10px; border: 2px dashed #e2e8f0; background: #f8fafc; font-weight: 600;">
+                </div>
+
+                <div style="margin-top: 3rem; padding-top: 2rem; border-top: 2px solid #f1f5f9;">
+                    <h3 style="margin-bottom: 1.5rem; display: flex; align-items: center; gap: 12px; font-size: 1.1rem;">
+                        <span class="material-symbols-outlined" style="color: var(--rs-secondary);">lock</span>
+                        Security Settings
+                    </h3>
+                    
+                    <div style="margin-bottom: 1.5rem;">
+                        <label style="display: block; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; color: #64748b; margin-bottom: 8px;">Current Password</label>
+                        <input type="password" name="current_password" style="width: 100%; padding: 1rem; border-radius: 10px; border: 1px solid #e2e8f0; font-weight: 700;" placeholder="Required to change password">
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+                        <div>
+                            <label style="display: block; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; color: #64748b; margin-bottom: 8px;">New Password</label>
+                            <input type="password" name="new_password" style="width: 100%; padding: 1rem; border-radius: 10px; border: 1px solid #e2e8f0; font-weight: 700;" placeholder="Minimum 8 characters">
+                        </div>
+                        <div>
+                            <label style="display: block; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; color: #64748b; margin-bottom: 8px;">Confirm New Password</label>
+                            <input type="password" name="confirm_password" style="width: 100%; padding: 1rem; border-radius: 10px; border: 1px solid #e2e8f0; font-weight: 700;" placeholder="Repeat new password">
+                        </div>
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 1.25rem; margin-top: 3rem;">
+                    <button type="submit" class="btn-rs btn-rs-primary" style="flex: 2; justify-content: center; padding: 1.25rem;">
+                        <span class="material-symbols-outlined">save</span>
+                        Save Changes
+                    </button>
+                    <a href="dashboard.php" class="btn-rs" style="flex: 1; justify-content: center; background: #f1f5f9; text-decoration: none; color: #64748b;">Cancel</a>
+                </div>
+            </form>
         </div>
     </div>
 </div>

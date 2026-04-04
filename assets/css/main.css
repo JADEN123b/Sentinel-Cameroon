@@ -8,10 +8,6 @@
     box-sizing: border-box;
 }
 
-html {
-    scroll-behavior: smooth;
-}
-
 body {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     line-height: 1.6;
@@ -67,6 +63,10 @@ body {
     justify-content: space-between;
 }
 
+.justify-center {
+    justify-content: center;
+}
+
 .gap-2 { gap: 0.5rem; }
 .gap-3 { gap: 0.75rem; }
 .gap-4 { gap: 1rem; }
@@ -97,6 +97,73 @@ h4 { font-size: 1.25rem; font-weight: 500; }
 .font-bold { font-weight: 700; }
 .font-medium { font-weight: 500; }
 
+.text-center {
+    text-align: center;
+}
+
+.text-2xl {
+    font-size: 1.5rem;
+    font-weight: 600;
+}
+
+.text-3xl {
+    font-size: 1.875rem;
+    font-weight: 600;
+}
+
+.text-5xl {
+    font-size: 3rem;
+    font-weight: 700;
+}
+
+.text-xl {
+    font-size: 1.25rem;
+}
+
+.mb-2 {
+    margin-bottom: 0.5rem;
+}
+
+.mb-3 {
+    margin-bottom: 0.75rem;
+}
+
+.mb-4 {
+    margin-bottom: 1rem;
+}
+
+.mb-6 {
+    margin-bottom: 1.5rem;
+}
+
+.mb-8 {
+    margin-bottom: 2rem;
+}
+
+.mb-12 {
+    margin-bottom: 3rem;
+}
+
+.mt-2 {
+    margin-top: 0.5rem;
+}
+
+.mt-4 {
+    margin-top: 1rem;
+}
+
+.mt-6 {
+    margin-top: 1.5rem;
+}
+
+.mt-8 {
+    margin-top: 2rem;
+}
+
+.mt-12 {
+    margin-top: 3rem;
+}
+
 /* Navigation */
 .navbar {
     background: var(--surface);
@@ -104,7 +171,14 @@ h4 { font-size: 1.25rem; font-weight: 500; }
     padding: 1rem 0;
     position: sticky;
     top: 0;
-    z-index: 100;
+    z-index: 1000;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.navbar-nav {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
 }
 
 .navbar-brand {
@@ -112,12 +186,11 @@ h4 { font-size: 1.25rem; font-weight: 500; }
     font-weight: 700;
     color: var(--primary);
     text-decoration: none;
+    transition: color 0.2s ease;
 }
 
-.navbar-nav {
-    display: flex;
-    gap: 2rem;
-    align-items: center;
+.navbar-brand:hover {
+    color: var(--primary-dark);
 }
 
 .nav-link {

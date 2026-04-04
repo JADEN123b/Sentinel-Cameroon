@@ -4,6 +4,44 @@
 CREATE DATABASE IF NOT EXISTS sentinel_cameroon;
 USE sentinel_cameroon;
 
+-- Email verifications table
+CREATE TABLE email_verifications (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    token VARCHAR(255) UNIQUE NOT NULL,
+    email VARCHAR(100) NOT NULL,
+    expires_at TIMESTAMP NOT NULL,
+    is_used BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- Password resets table
+CREATE TABLE password_resets (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    token VARCHAR(255) UNIQUE NOT NULL,
+    email VARCHAR(100) NOT NULL,
+    expires_at TIMESTAMP NOT NULL,
+    is_used BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- Email notifications log
+CREATE TABLE email_notifications (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT,
+    email_type ENUM('verification', 'password_reset', 'welcome', 'incident_alert', 'system') NOT NULL,
+    email VARCHAR(100) NOT NULL,
+    subject VARCHAR(255) NOT NULL,
+    status ENUM('sent', 'failed', 'pending') DEFAULT 'pending',
+    error_message TEXT,
+    sent_at TIMESTAMP NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+);
+
 -- Users table
 CREATE TABLE users (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -12,11 +50,10 @@ CREATE TABLE users (
     password_hash VARCHAR(255) NOT NULL,
     full_name VARCHAR(100) NOT NULL,
     phone VARCHAR(20),
+    profile_picture VARCHAR(255),
     role ENUM('user', 'authority', 'admin') DEFAULT 'user',
     is_verified BOOLEAN DEFAULT FALSE,
-    verification_token VARCHAR(255) DEFAULT NULL,
-    reset_token VARCHAR(255) DEFAULT NULL,
-    reset_token_expires DATETIME DEFAULT NULL,
+    email_verified_at TIMESTAMP NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );

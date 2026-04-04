@@ -1,0 +1,244 @@
+/* 🛡️ Sentinel Framework - Unified Professional Design System */
+/* Clean, Full-Width SaaS Architecture - Navy & Safety Orange */
+
+@import url('https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;700;900&family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+:root {
+    /* Brand Colors - High Contrast Professional Palette */
+    --rs-primary: #0f172a;       /* Deep Navy */
+    --rs-primary-light: #1e293b;
+    --rs-secondary: #f97316;     /* Safety Orange */
+    --rs-accent: #3b82f6;        /* Info Blue */
+    --rs-success: #10b981;       /* Operational Green */
+    --rs-error: #ef4444;         /* Emergency Red */
+    --rs-warning: #f59e0b;       /* Alert Yellow */
+    
+    /* Surfaces - Solid Professional Look */
+    --rs-bg: #f1f5f9;
+    --rs-surface: #ffffff;
+    --rs-surface-alt: #f8fafc;
+    --rs-border: #e2e8f0;
+    --rs-shadow: 0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06);
+    --rs-shadow-lg: 0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1);
+    
+    /* Layout Constants */
+    --rs-sidebar-width: 260px;
+    --rs-transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Base Overhaul */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    font-family: 'Inter', sans-serif;
+    background-color: var(--rs-bg);
+    color: var(--rs-primary);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4, .font-headline {
+    font-family: 'Public Sans', sans-serif;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    color: var(--rs-primary);
+}
+
+/* 🏢 Full-Width Layout Architecture */
+.app-shell {
+    display: flex;
+    min-height: 100vh;
+}
+
+.main-content {
+    flex: 1;
+    padding: 2.5rem;
+    transition: var(--rs-transition);
+}
+
+.fluid-container {
+    width: 100%;
+    margin: 0 auto;
+}
+
+/* 🧭 Unified Sidebar - Clean & Solid */
+.sidebar {
+    width: var(--rs-sidebar-width);
+    background: var(--rs-primary);
+    color: white;
+    height: 100vh;
+    position: sticky;
+    top: 0;
+    display: flex;
+    flex-direction: column;
+    z-index: 100;
+}
+
+.sidebar-header {
+    padding: 2.5rem 1.5rem;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+
+.sidebar-brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.sidebar-brand-icon {
+    background: var(--rs-secondary);
+    color: var(--rs-primary);
+    padding: 8px;
+    border-radius: 8px;
+    font-weight: 900;
+}
+
+.sidebar-menu {
+    flex: 1;
+    padding: 1.5rem 0.75rem;
+}
+
+.sidebar-link {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 0.85rem 1.25rem;
+    color: rgba(255,255,255,0.7);
+    text-decoration: none;
+    font-weight: 500;
+    border-radius: 8px;
+    margin-bottom: 0.25rem;
+    transition: var(--rs-transition);
+    font-size: 0.9rem;
+}
+
+.sidebar-link:hover {
+    background: rgba(255,255,255,0.05);
+    color: white;
+}
+
+.sidebar-link.active {
+    background: var(--rs-secondary);
+    color: white;
+    font-weight: 700;
+}
+
+/* 💳 Clean Professional Cards */
+.rs-card {
+    background: var(--rs-surface);
+    border: 1px solid var(--rs-border);
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: var(--rs-shadow);
+    transition: var(--rs-transition);
+    position: relative;
+    overflow: hidden;
+}
+
+.rs-card.hover:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--rs-shadow-lg);
+    border-color: #cbd5e1;
+}
+
+/* 🌩️ Sections & Panels */
+.glass-panel {
+    background: var(--rs-surface);
+    border: 1px solid var(--rs-border);
+    border-radius: 16px;
+    box-shadow: var(--rs-shadow);
+}
+
+.hero-panel {
+    background: var(--rs-primary);
+    color: white;
+    padding: 3rem;
+    border-radius: 20px;
+    margin-bottom: 2rem;
+    position: relative;
+    overflow: hidden;
+}
+
+/* ⚡ Unified Buttons */
+.btn-rs {
+    padding: 0.7rem 1.25rem;
+    border-radius: 8px;
+    font-weight: 700;
+    font-size: 0.85rem;
+    transition: var(--rs-transition);
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    border: none;
+    text-decoration: none;
+}
+
+.btn-rs-primary {
+    background: var(--rs-secondary);
+    color: white;
+}
+
+.btn-rs-primary:hover {
+    background: #ea580c;
+    transform: scale(1.01);
+}
+
+.btn-rs-outline {
+    background: white;
+    border: 1px solid var(--rs-border);
+    color: var(--rs-primary);
+}
+
+.btn-rs-outline:hover {
+    background: var(--rs-bg);
+}
+
+/* 🌊 Micro-Animations */
+@keyframes rs-fade-in {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-rs {
+    animation: rs-fade-in 0.4s ease-out forwards;
+}
+
+/* 📊 Stats Grid */
+.rs-grid {
+    display: grid;
+    gap: 1.5rem;
+}
+
+.rs-grid-stats { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+.rs-grid-2 { grid-template-columns: repeat(2, 1fr); }
+.rs-grid-main { grid-template-columns: 1fr 320px; }
+
+@media (max-width: 1024px) {
+    .main-content {
+        padding: 1rem;
+    }
+    .rs-grid-main { grid-template-columns: 1fr; }
+    .rs-grid-stats { grid-template-columns: 1fr; }
+    
+    /* Mobile Drawer Sidebar */
+    .sidebar { 
+        position: fixed;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        z-index: 4000;
+        transform: translateX(-100%);
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        display: flex !important;
+        box-shadow: var(--rs-shadow-lg);
+    }
+    
+    .sidebar.active {
+        transform: translateX(0);
+    }
+}
+
+/* Language Simplification Utilities */
+.text-label { font-size: 0.75rem; text-transform: uppercase; font-weight: 800; color: #64748b; letter-spacing: 0.05em; }
+.text-value { font-size: 1.75rem; font-weight: 800; color: var(--rs-primary); }

@@ -1,14 +1,10 @@
 <?php
-session_start();
-require_once 'database/config.php';
-require_once 'includes/auth.php';
-
-// Auto-protect current page
-autoProtect();
-
-$user = getCurrentUser();
-$user_role = getUserRole();
-$current_page = basename($_SERVER['PHP_SELF']);
+/**
+ * Sentinel Cameroon - Visual Header Template
+ * This file contains only the visual structure (sidebar, head, and layout).
+ * auth.php must be included before this file at the page entry point.
+ */
+require_once __DIR__ . '/auth.php';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -16,190 +12,288 @@ $current_page = basename($_SERVER['PHP_SELF']);
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sentinel Cameroon - Community Safety Platform</title>
-    <link rel="stylesheet" href="assets/css/main.css">
-    <link rel="stylesheet" href="assets/css/components.css">
-    <link rel="stylesheet" href="assets/css/responsive.css">
-    <link rel="stylesheet" href="assets/css/profile-fix.css">
-    <link rel="stylesheet" href="assets/css/modern-framework.css">
+    <title>Sentinel Cameroon | Local Safety Network</title>
+
+    <!-- 🛡️ Unified Design System -->
+    <link rel="stylesheet" href="assets/css/resilient-sentinel.css">
+    <link rel="stylesheet" href="assets/css/authoritative.css">
+
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Public+Sans:wght@600;700;800;900&display=swap"
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Public+Sans:wght@700;800;900&display=swap"
         rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
         rel="stylesheet">
-    
+
     <style>
-        /* Modern Layout Fixes */
-        .desktop-navbar {
-            background: var(--surface);
-            border-bottom: 1px solid var(--surface-container);
-            padding: 0.875rem 0;
-            position: sticky;
-            top: 0;
-            z-index: 100;
+        /* Modern Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
         }
-        
-        @media (max-width: 768px) {
-            .desktop-navbar, .sidebar {
+
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 10px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+
+        .sidebar-user-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* FORCE MOBILE DRAWER OVERRIDES TO BYPASS CACHE */
+        @media (max-width: 1024px) {
+            .sidebar {
+                position: fixed !important;
+                left: 0;
+                top: 0;
+                bottom: 0;
+                width: 280px;
+                z-index: 4000;
+                transform: translateX(-100%);
+                transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                display: flex !important;
+                flex-direction: column;
+                overflow-y: auto !important;
+                box-shadow: 10px 0 30px rgba(0, 0, 0, 0.3);
+            }
+
+            .sidebar.active {
+                transform: translateX(0) !important;
+            }
+
+            .drawer-overlay {
+                position: fixed;
+                inset: 0;
+                background: rgba(15, 23, 42, 0.4);
+                backdrop-filter: blur(4px);
+                -webkit-backdrop-filter: blur(4px);
+                z-index: 3800;
                 display: none;
             }
+
+            .drawer-overlay.active {
+                display: block !important;
+            }
+
+            .mobile-hamburger {
+                display: flex !important;
+            }
+
+            /* =========================================
+               GLOBAL MOBILE VIEWPORT LOCK-DOWN
+               ========================================= */
+            .no-scroll {
+                overflow: hidden !important;
+                height: 100vh !important;
+            }
+
+            html,
+            body,
+            .app-shell,
+            .fluid-container {
+                overflow-x: hidden !important;
+                max-width: 100vw !important;
+                width: 100% !important;
+                box-sizing: border-box !important;
+            }
+
             .main-content {
-                margin-left: 0 !important;
-                padding-bottom: 80px; /* Space for bottom nav */
+                padding: 0.75rem !important;
+                overflow-x: hidden !important;
+                max-width: 100vw !important;
+                width: 100% !important;
+                box-sizing: border-box !important;
+            }
+
+            .rs-card {
+                padding: 1.25rem !important;
+                /* Force overrides all inline desktop paddings */
+                max-width: 100% !important;
+                box-sizing: border-box !important;
+                overflow-x: hidden !important;
+            }
+
+            h1 {
+                font-size: 1.75rem !important;
+            }
+
+            h2 {
+                font-size: 1.35rem !important;
             }
         }
     </style>
 </head>
 
-<body class="<?php echo isLoggedIn() ? 'has-bottom-nav' : ''; ?>">
+<body style="background-color: var(--rs-bg); -webkit-font-smoothing: antialiased;">
+    <div id="drawerOverlay" class="drawer-overlay" onclick="toggleSidebar()"></div>
+    <div class="app-shell">
+        <?php if (isLoggedIn()): ?>
+            <aside class="sidebar">
+                <div class="sidebar-header">
+                    <div class="sidebar-brand">
+                        <span class="material-symbols-outlined sidebar-brand-icon">shield</span>
+                        <h3 style="color: white; margin: 0; font-size: 1.25rem;">Sentinel</h3>
+                    </div>
+                </div>
 
-    <?php if (isLoggedIn()): ?>
+                <div
+                    style="padding: 1.5rem; margin: 0 0.75rem 1rem; background: rgba(255,255,255,0.03); border-radius: 12px; display: flex; align-items: center; gap: 12px;">
+                    <?php
+                    $user = getCurrentUser();
+                    if ($user && !empty($user['profile_picture'])): ?>
+                        <div class="sidebar-user-avatar">
+                            <img src="<?php echo htmlspecialchars($user['profile_picture']); ?>"
+                                style="width: 100%; height: 100%; object-fit: cover;">
+                        </div>
+                    <?php else: ?>
+                        <div class="sidebar-user-avatar">
+                            <span class="material-symbols-outlined"
+                                style="color: rgba(255,255,255,0.5); font-size: 1.25rem;">person</span>
+                        </div>
+                    <?php endif; ?>
+                    <div style="overflow: hidden;">
+                        <div
+                            style="font-size: 0.85rem; font-weight: 700; color: white; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                            <?php echo htmlspecialchars($user['full_name']); ?>
+                        </div>
+                        <div
+                            style="font-size: 0.65rem; color: rgba(255,255,255,0.4); text-transform: uppercase; letter-spacing: 1px;">
+                            <?php echo getUserRole() === 'authority_pending' ? 'Pending' : ucfirst(getUserRole()); ?>
+                            Account
+                        </div>
+                    </div>
+                </div>
 
-        <!-- ── Mobile Top Bar ── -->
-        <header class="mobile-topbar">
-            <span class="mobile-topbar-title">Sentinel Cameroon</span>
-            <div class="mobile-topbar-actions">
-                <a href="alerts.php" class="mobile-icon-btn" title="Alerts">
-                    <span class="material-symbols-outlined">notifications</span>
-                </a>
-                <a href="profile.php" class="mobile-avatar" title="Profile">
-                    <?php echo strtoupper(substr($user['full_name'] ?? 'U', 0, 1)); ?>
-                </a>
-            </div>
-        </header>
-
-        <!-- ── Desktop Navbar ── -->
-        <nav class="desktop-navbar">
-            <div class="container flex justify-between items-center">
-                <div class="flex items-center gap-6">
-                    <a href="dashboard.php" class="navbar-brand">Sentinel Cameroon</a>
-                    <nav class="navbar-nav">
+                <nav class="sidebar-menu">
+                    <?php if (getUserRole() === 'admin' || getUserRole() === 'authority' || getUserRole() === 'authority_pending'): ?>
+                        <a href="admin.php"
+                            class="sidebar-link <?php echo basename($_SERVER['PHP_SELF']) == 'admin.php' ? 'active' : ''; ?>">
+                            <span class="material-symbols-outlined">dashboard</span>
+                            Main Dashboard
+                        </a>
+                    <?php else: ?>
                         <a href="dashboard.php"
-                            class="nav-link <?php echo $current_page == 'dashboard.php' ? 'active' : ''; ?>">Dashboard</a>
-                        <a href="incidents.php"
-                            class="nav-link <?php echo $current_page == 'incidents.php' ? 'active' : ''; ?>">Incidents</a>
-                        <a href="map.php"
-                            class="nav-link <?php echo $current_page == 'map.php' ? 'active' : ''; ?>">Map</a>
-                        <a href="alerts.php"
-                            class="nav-link <?php echo $current_page == 'alerts.php' ? 'active' : ''; ?>">Alerts</a>
-                        <a href="partners.php"
-                            class="nav-link <?php echo $current_page == 'partners.php' ? 'active' : ''; ?>">Partners</a>
-                        <?php if ($user_role === 'authority' || $user_role === 'admin'): ?>
-                            <a href="admin.php"
-                                class="nav-link <?php echo $current_page == 'admin.php' ? 'active' : ''; ?>">Admin Panel</a>
-                        <?php endif; ?>
-                    </nav>
-                </div>
-                <div class="flex items-center gap-4">
-                    <span class="text-sm text-gray-600">Welcome,
-                        <?php echo htmlspecialchars($user['full_name'] ?? ''); ?></span>
-                    <a href="profile.php" class="nav-link">Profile</a>
-                    <a href="logout.php" class="nav-link">Logout</a>
-                </div>
-            </div>
-        </nav>
+                            class="sidebar-link <?php echo basename($_SERVER['PHP_SELF']) == 'dashboard.php' ? 'active' : ''; ?>">
+                            <span class="material-symbols-outlined">home</span>
+                            My Overview
+                        </a>
+                    <?php endif; ?>
 
-        <!-- ── Desktop Sidebar ── -->
-        <aside class="sidebar">
-            <div class="sidebar-brand">
-                <h3 style="font-size:1.125rem;font-weight:700;color:var(--primary);">Sentinel Cameroon</h3>
-                <p class="text-xs text-gray-500 mt-1"><?php echo ucfirst($user_role); ?> Portal</p>
-            </div>
-            <nav class="sidebar-nav">
-                <a href="dashboard.php"
-                    class="sidebar-link <?php echo $current_page == 'dashboard.php' ? 'active' : ''; ?>">
-                    <span class="material-symbols-outlined">dashboard</span>
-                    Overview
-                </a>
-                <a href="incidents.php"
-                    class="sidebar-link <?php echo $current_page == 'incidents.php' ? 'active' : ''; ?>">
-                    <span class="material-symbols-outlined">emergency</span>
-                    Incidents
-                </a>
-                <a href="report_incident.php"
-                    class="sidebar-link <?php echo $current_page == 'report_incident.php' ? 'active' : ''; ?>">
-                    <span class="material-symbols-outlined">add_alert</span>
-                    Report Incident
-                </a>
-                <a href="map.php"
-                    class="sidebar-link <?php echo $current_page == 'map.php' ? 'active' : ''; ?>">
-                    <span class="material-symbols-outlined">map</span>
-                    Live Map
-                </a>
-                <a href="alerts.php"
-                    class="sidebar-link <?php echo $current_page == 'alerts.php' ? 'active' : ''; ?>">
-                    <span class="material-symbols-outlined">notifications_active</span>
-                    Alerts
-                </a>
-                <a href="partners.php"
-                    class="sidebar-link <?php echo $current_page == 'partners.php' ? 'active' : ''; ?>">
-                    <span class="material-symbols-outlined">handshake</span>
-                    Partners
-                </a>
-                <a href="profile.php"
-                    class="sidebar-link <?php echo $current_page == 'profile.php' ? 'active' : ''; ?>">
-                    <span class="material-symbols-outlined">person</span>
-                    Profile
-                </a>
-                <?php if ($user_role === 'authority' || $user_role === 'admin'): ?>
-                    <a href="admin.php"
-                        class="sidebar-link <?php echo $current_page == 'admin.php' ? 'active' : ''; ?>">
-                        <span class="material-symbols-outlined">admin_panel_settings</span>
-                        Admin Panel
+                    <a href="incidents.php"
+                        class="sidebar-link <?php echo basename($_SERVER['PHP_SELF']) == 'incidents.php' ? 'active' : ''; ?>">
+                        <span class="material-symbols-outlined">description</span>
+                        Incident Reports
                     </a>
-                <?php endif; ?>
-                <a href="logout.php" class="sidebar-link" style="margin-top:auto;color:var(--error);">
-                    <span class="material-symbols-outlined">logout</span>
-                    Sign Out
-                </a>
-            </nav>
-        </aside>
 
-        <!-- ── Mobile Bottom Navigation ── -->
-        <nav class="bottom-nav" aria-label="Main navigation">
-            <a href="dashboard.php"
-                class="bottom-nav-item <?php echo $current_page == 'dashboard.php' ? 'active' : ''; ?>">
-                <span class="material-symbols-outlined">dashboard</span>
-                <span>Home</span>
-            </a>
-            <a href="incidents.php"
-                class="bottom-nav-item <?php echo $current_page == 'incidents.php' ? 'active' : ''; ?>">
-                <span class="material-symbols-outlined">emergency</span>
-                <span>Incidents</span>
-            </a>
-            <!-- Center FAB: Report -->
-            <a href="report_incident.php" class="bottom-nav-fab" aria-label="Report an incident">
-                <div class="fab-circle">
-                    <span class="material-symbols-outlined">add_alert</span>
-                </div>
-                <span class="fab-label">Report</span>
-            </a>
-            <a href="map.php" class="bottom-nav-item <?php echo $current_page == 'map.php' ? 'active' : ''; ?>">
-                <span class="material-symbols-outlined">map</span>
-                <span>Map</span>
-            </a>
-            <a href="alerts.php"
-                class="bottom-nav-item <?php echo $current_page == 'alerts.php' ? 'active' : ''; ?>">
-                <span class="material-symbols-outlined">notifications</span>
-                <span>Alerts</span>
-            </a>
-        </nav>
+                    <a href="map-functional.php"
+                        class="sidebar-link <?php echo basename($_SERVER['PHP_SELF']) == 'map-functional.php' ? 'active' : ''; ?>">
+                        <span class="material-symbols-outlined">map</span>
+                        Live Map
+                    </a>
 
-    <?php else: ?>
-        <!-- Public nav (unauthenticated) -->
-        <nav class="desktop-navbar">
-            <div class="container flex justify-between items-center">
-                <a href="index.php" class="navbar-brand">Sentinel Cameroon</a>
-                <nav class="navbar-nav">
-                    <a href="login.php" class="nav-link">Login</a>
-                    <a href="register.php" class="nav-link">Register</a>
-                    <a href="authority_register.php" class="nav-link">Authority Registration</a>
+                    <a href="communities.php"
+                        class="sidebar-link <?php echo basename($_SERVER['PHP_SELF']) == 'communities.php' ? 'active' : ''; ?>">
+                        <span class="material-symbols-outlined">groups</span>
+                        Communities
+                    </a>
+
+                    <a href="market.php"
+                        class="sidebar-link <?php echo basename($_SERVER['PHP_SELF']) == 'market.php' ? 'active' : ''; ?>">
+                        <span class="material-symbols-outlined">shopping_bag</span>
+                        Marketplace
+                    </a>
+
+                    <a href="partners.php"
+                        class="sidebar-link <?php echo basename($_SERVER['PHP_SELF']) == 'partners.php' ? 'active' : ''; ?>">
+                        <span class="material-symbols-outlined">group</span>
+                        Our Partners
+                    </a>
+
+                    <div style="margin: 1.5rem; border-top: 1px solid rgba(255,255,255,0.05);"></div>
+
+                    <a href="profile.php"
+                        class="sidebar-link <?php echo basename($_SERVER['PHP_SELF']) == 'profile.php' ? 'active' : ''; ?>">
+                        <span class="material-symbols-outlined">manage_accounts</span>
+                        My Profile
+                    </a>
+
+                    <a href="logout.php" class="sidebar-link" style="margin-top: auto; color: #f87171;">
+                        <span class="material-symbols-outlined">logout</span>
+                        Log Out
+                    </a>
                 </nav>
-            </div>
-        </nav>
-    <?php endif; ?>
+            </aside>
+        <?php endif; ?>
 
-    <main class="main-content">
-        <div class="container">
+        <main class="main-content">
+            <div class="fluid-container">
+                <?php if (isLoggedIn()): ?>
+                    <!-- Mobile Top Bar -->
+                    <style>
+                        /* Custom Premium Hamburger Bars */
+                        .mobile-hamburger {
+                            display: flex;
+                            flex-direction: column;
+                            justify-content: center;
+                            align-items: center;
+                            gap: 5px;
+                            background: white;
+                            border: 1px solid #e2e8f0;
+                            width: 44px;
+                            height: 44px;
+                            border-radius: 12px;
+                            cursor: pointer;
+                            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+                            transition: all 0.2s ease;
+                            padding: 0;
+                            outline: none;
+                        }
+
+                        .mobile-hamburger:active {
+                            transform: scale(0.92);
+                        }
+
+                        .hamburger-bar {
+                            display: block;
+                            width: 20px;
+                            height: 2.5px;
+                            background-color: var(--rs-primary);
+                            border-radius: 4px;
+                            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                        }
+
+                        .mobile-hamburger:hover .hamburger-bar {
+                            background-color: var(--rs-secondary);
+                        }
+                    </style>
+                    <div class="mobile-only"
+                        style="align-items: center; justify-content: space-between; margin-bottom: 2rem;">
+                        <button class="mobile-hamburger" onclick="toggleSidebar()" aria-label="Toggle Sidebar">
+                            <span class="hamburger-bar"></span>
+                            <span class="hamburger-bar"></span>
+                            <span class="hamburger-bar"></span>
+                        </button>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span class="material-symbols-outlined"
+                                style="color: var(--rs-secondary); font-size: 1.5rem;">shield</span>
+                            <span style="font-weight: 900; font-size: 1.1rem;">Sentinel</span>
+                        </div>
+                    </div>
+                <?php endif; ?>

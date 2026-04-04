@@ -2,26 +2,12 @@
 header('Content-Type: application/json');
 session_start();
 require_once '../database/config.php';
-require_once '../includes/auth.php';
-
-// Set global security headers
-setSecurityHeaders();
 
 // Check if user is logged in and has authority role
 if (!isset($_SESSION['user_id']) || $_SESSION['user_role'] !== 'authority') {
     echo json_encode([
         'success' => false,
         'message' => 'Unauthorized. Authority access required.'
-    ]);
-    exit;
-}
-
-// CSRF Check for API
-$csrf_token = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
-if (!verifyCsrfToken($csrf_token)) {
-    echo json_encode([
-        'success' => false,
-        'message' => 'CSRF token validation failed.'
     ]);
     exit;
 }
@@ -52,6 +38,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($data['incident_id']) && isse
         $stmt = $db->query("UPDATE incidents SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", [$new_status, $incident_id]);
         
         if ($stmt) {
+            // Super Admin Oversight: Log the incident status update
+            logSystemActivity("Incident status updated to '$new_status' for Incident ID: $incident_id", "incident");
+            
             echo json_encode([
                 'success' => true,
                 'message' => 'Incident status updated successfully.'
