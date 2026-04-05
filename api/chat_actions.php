@@ -19,7 +19,7 @@ if (!isset($data['action'])) {
 
 // Security: Check if user is a member of the community
 if (isset($data['community_id'])) {
-    $is_member = $db->query("SELECT role FROM community_members WHERE community_id = ? AND user_id = ?", [$data['community_id'], $current_user_id])->fetch();
+    $is_member = $db->fetch("SELECT role FROM community_members WHERE community_id = ? AND user_id = ?", [$data['community_id'], $current_user_id]);
     if (!$is_member) {
         echo json_encode(['success' => false, 'message' => 'Not a member.']);
         exit;
@@ -76,7 +76,7 @@ switch ($data['action']) {
 
     case 'delete':
         if (empty($data['message_id'])) exit;
-        $msg = $db->query("SELECT user_id FROM community_messages WHERE id = ?", [$data['message_id']])->fetch();
+        $msg = $db->fetch("SELECT user_id FROM community_messages WHERE id = ?", [$data['message_id']]);
         if (!$msg) exit;
         
         // Author or Admin can delete

@@ -88,7 +88,7 @@ switch ($data['action']) {
         if (!$cid) exit;
         
         // Admin check
-        $role = $db->query("SELECT role FROM community_members WHERE community_id = ? AND user_id = ?", [$cid, $current_user_id])->fetch();
+        $role = $db->fetch("SELECT role FROM community_members WHERE community_id = ? AND user_id = ?", [$cid, $current_user_id]);
         if (!$role || $role['role'] !== 'admin') {
             echo json_encode(['success' => false, 'message' => 'Unauthorized.']);
             exit;

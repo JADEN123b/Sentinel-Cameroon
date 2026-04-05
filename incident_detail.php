@@ -223,33 +223,26 @@ $attachments = $db->query("
 </script>
 <?php endif; ?>
 
+<!-- API Client Script -->
+<script src="assets/js/api-client.js"></script>
+
 <!-- Status Update Script -->
 <?php if (getUserRole() === 'authority'): ?>
 <script>
-    function updateStatus(incidentId, newStatus) {
+    async function updateStatus(incidentId, newStatus) {
         if (confirm('Are you sure you want to update the incident status to ' + newStatus + '?')) {
-            fetch('api/update_status.php', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    incident_id: incidentId,
-                    status: newStatus
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    alert('Status updated successfully!');
-                    location.reload();
-                } else {
-                    alert('Error: ' + data.message);
-                }
-            })
-            .catch(error => {
-                alert('Error updating status. Please try again.');
+            const result = await API.post('api/update_status.php', {
+                incident_id: incidentId,
+                status: newStatus
             });
+            
+            if (result.success && result.data.success) {
+                alert('Status updated successfully!');
+                location.reload();
+            } else {
+                alert('Error: ' + (result.data?.message || result.error || 'Unknown error'));
+                console.error('Update failed:', result);
+            }
         }
     }
 </script>

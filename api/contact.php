@@ -23,7 +23,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         $db = new Database();
         
         // Get partner info
-        $partner = $db->query("SELECT * FROM partners WHERE id = ?", [$partner_id])->fetch();
+        $partner = $db->fetch("SELECT * FROM partners WHERE id = ?", [$partner_id]);
         
         if ($partner) {
             // Create contact record (you could create a separate table for this)

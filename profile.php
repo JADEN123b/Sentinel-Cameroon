@@ -78,9 +78,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $db = new Database();
+$reported_result = $db->fetch("SELECT COUNT(*) as count FROM incidents WHERE user_id = ?", [$user['id']]);
+$resolved_result = $db->fetch("SELECT COUNT(*) as count FROM incidents WHERE user_id = ? AND status = 'resolved'", [$user['id']]);
+
 $stats = [
-    'reported' => $db->query("SELECT COUNT(*) as count FROM incidents WHERE user_id = ?", [$user['id']])->fetch()['count'],
-    'resolved' => $db->query("SELECT COUNT(*) as count FROM incidents WHERE user_id = ? AND status = 'resolved'", [$user['id']])->fetch()['count'],
+    'reported' => $reported_result ? $reported_result['count'] : 0,
+    'resolved' => $resolved_result ? $resolved_result['count'] : 0,
     'account_age' => floor((time() - strtotime($user['created_at'])) / 86400)
 ];
 ?>

@@ -166,36 +166,26 @@
         }
     }
 
-    function sendSOS(lat, lng) {
-        <?php
-            $base_path = dirname($_SERVER['PHP_SELF']);
-            if ($base_path === '/' || $base_path === '\\') $base_path = '';
-        ?>
-        const apiUrl = '<?php echo $base_path; ?>/api/sos_trigger.php';
-
-        fetch(apiUrl, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ latitude: lat, longitude: lng })
-        })
-        .then(r => r.json())
-        .then(d => {
-            if (d.success) {
-                alert('SOS BEACON ACTIVATED. Responders have been notified.');
-                window.location.reload();
-            } else {
-                alert('SOS Transmission Failed: ' + (d.message || 'Unknown Error'));
-                const btn = document.getElementById('globalSosBtn');
-                if (btn) btn.innerHTML = '<span class="material-symbols-outlined">sos</span>';
-            }
-        })
-        .catch(() => {
-            alert('SOS Transmission Error. Please call emergency services immediately.');
+    async function sendSOS(lat, lng) {
+        const result = await API.post('api/sos_trigger.php', { 
+            latitude: lat, 
+            longitude: lng 
+        });
+        
+        if (result.success && result.data.success) {
+            alert('SOS BEACON ACTIVATED. Responders have been notified.');
+            window.location.reload();
+        } else {
+            alert('SOS Transmission Failed: ' + (result.data?.message || result.error || 'Unknown Error'));
             const btn = document.getElementById('globalSosBtn');
             if (btn) btn.innerHTML = '<span class="material-symbols-outlined">sos</span>';
-        });
+            console.error('SOS Error:', result);
+        }
     }
 </script>
+
+<!-- API Client functionality for SOS -->
+<script src="assets/js/api-client.js"></script>
 <?php endif; ?>
 
 

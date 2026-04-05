@@ -61,7 +61,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $error = 'Passwords do not match.';
         } else {
             // Check if user exists
-            $existing = $db->query("SELECT id FROM users WHERE email = ? OR username = ?", [$email, $username])->fetch();
+            $existing = $db->fetch("SELECT id FROM users WHERE email = ? OR username = ?", [$email, $username]);
             if ($existing) {
                 $error = 'This email or username is already registered.';
             } else {

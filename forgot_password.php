@@ -16,7 +16,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $db = new Database();
         
         // Check if user exists
-        $user = $db->query("SELECT id, full_name, email FROM users WHERE email = ?", [$email])->fetch();
+        $user = $db->fetch("SELECT id, full_name, email FROM users WHERE email = ?", [$email]);
         
         if (!$user) {
             // Don't reveal if email exists or not for security

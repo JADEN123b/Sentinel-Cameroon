@@ -31,7 +31,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($data['incident_id']) && isse
     $db = new Database();
     
     // Check if incident exists
-    $incident = $db->query("SELECT id FROM incidents WHERE id = ?", [$incident_id])->fetch();
+    $incident = $db->fetch("SELECT id FROM incidents WHERE id = ?", [$incident_id]);
     
     if ($incident) {
         // Update incident status

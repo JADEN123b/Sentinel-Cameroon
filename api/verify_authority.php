@@ -15,7 +15,7 @@ if (!isset($_SESSION['user_id'])) {
 $db = new Database();
 
 // Verify that the acting user is an admin
-$actor = $db->query("SELECT role FROM users WHERE id = ?", [$_SESSION['user_id']])->fetch();
+$actor = $db->fetch("SELECT role FROM users WHERE id = ?", [$_SESSION['user_id']]);
 if (!$actor || $actor['role'] !== 'admin') {
     echo json_encode(['success' => false, 'message' => 'Unauthorized. Only admins can verify authorities.']);
     exit;

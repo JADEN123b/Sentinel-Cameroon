@@ -19,25 +19,37 @@ require_once 'includes/header.php';
 $db = new Database();
 
 // Get recent reports
-$incidents = $db->query("
+$incidents = $db->fetchAll("
     SELECT i.*, u.full_name as reporter_name 
     FROM incidents i 
     LEFT JOIN users u ON i.user_id = u.id 
     ORDER BY i.created_at DESC 
     LIMIT 10
-")->fetchAll();
+", []);
 
 // Get statistics
+$total_incidents_result = $db->fetch("SELECT COUNT(*) as count FROM incidents");
+$active_incidents_result = $db->fetch("SELECT COUNT(*) as count FROM incidents WHERE status IN ('reported', 'verified', 'investigating')");
+$resolved_incidents_result = $db->fetch("SELECT COUNT(*) as count FROM incidents WHERE status = 'resolved'");
+$verified_users_result = $db->fetch("SELECT COUNT(*) as count FROM users WHERE is_verified = 1");
+
 $stats = [
-    'total_incidents' => $db->query("SELECT COUNT(*) as count FROM incidents")->fetch()['count'],
-    'active_incidents' => $db->query("SELECT COUNT(*) as count FROM incidents WHERE status IN ('reported', 'verified', 'investigating')")->fetch()['count'],
-    'resolved_incidents' => $db->query("SELECT COUNT(*) as count FROM incidents WHERE status = 'resolved'")->fetch()['count'],
-    'verified_users' => $db->query("SELECT COUNT(*) as count FROM users WHERE is_verified = 1")->fetch()['count']
+    'total_incidents' => $total_incidents_result ? $total_incidents_result['count'] : 0,
+    'active_incidents' => $active_incidents_result ? $active_incidents_result['count'] : 0,
+    'resolved_incidents' => $resolved_incidents_result ? $resolved_incidents_result['count'] : 0,
+    'verified_users' => $verified_users_result ? $verified_users_result['count'] : 0
 ];
 
 $current_user = getCurrentUser();
 $hour = (int)date('H');
 $greeting = ($hour < 12) ? "Good morning" : (($hour < 17) ? "Good afternoon" : "Good evening");
+
+// Safe extraction of user's first name
+$user_first_name = 'User';
+if ($current_user && isset($current_user['full_name']) && !empty($current_user['full_name'])) {
+    $name_parts = explode(' ', $current_user['full_name']);
+    $user_first_name = htmlspecialchars($name_parts[0] ?? 'User');
+}
 ?>
 
     
@@ -45,7 +57,7 @@ $greeting = ($hour < 12) ? "Good morning" : (($hour < 17) ? "Good afternoon" : "
     <div class="rs-card reveal" style="background: linear-gradient(135deg, var(--rs-primary) 0%, #020617 100%); color: white; padding: 3rem 2rem; margin-bottom: 2rem; border: none; border-radius: 20px; position: relative; overflow: hidden;">
         <div style="position: relative; z-index: 2;">
             <h1 style="font-size: 2.5rem; margin-bottom: 0.5rem; color: white; font-weight: 900; letter-spacing: -0.02em;">
-                <?php echo $greeting; ?>, <span style="color: var(--rs-secondary);"><?php echo htmlspecialchars(explode(' ', $current_user['full_name'])[0]); ?></span>
+                <?php echo $greeting; ?>, <span style="color: var(--rs-secondary);"><?php echo $user_first_name; ?></span>
             </h1>
             <p style="font-size: 1.1rem; opacity: 0.8; font-weight: 500;">Your safety perimeter is active and being monitored.</p>
         </div>

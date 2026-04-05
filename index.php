@@ -4,16 +4,16 @@ require_once 'includes/auth.php';
 // Get statistics
 $db = new Database();
 try {
-    $total_incidents_stmt = $db->query("SELECT COUNT(*) as count FROM incidents");
-    $active_incidents_stmt = $db->query("SELECT COUNT(*) as count FROM incidents WHERE status IN ('reported', 'verified', 'investigating')");
-    $total_users_stmt = $db->query("SELECT COUNT(*) as count FROM users");
-    $verified_partners_stmt = $db->query("SELECT COUNT(*) as count FROM partners WHERE is_verified = 1");
+    $total_incidents_result = $db->fetch("SELECT COUNT(*) as count FROM incidents");
+    $active_incidents_result = $db->fetch("SELECT COUNT(*) as count FROM incidents WHERE status IN ('reported', 'verified', 'investigating')");
+    $total_users_result = $db->fetch("SELECT COUNT(*) as count FROM users");
+    $verified_partners_result = $db->fetch("SELECT COUNT(*) as count FROM partners WHERE is_verified = 1");
 
     $stats = [
-        'total_incidents' => $total_incidents_stmt ? $total_incidents_stmt->fetch()['count'] : 0,
-        'active_incidents' => $active_incidents_stmt ? $active_incidents_stmt->fetch()['count'] : 0,
-        'total_users' => $total_users_stmt ? $total_users_stmt->fetch()['count'] : 0,
-        'verified_partners' => $verified_partners_stmt ? $verified_partners_stmt->fetch()['count'] : 0
+        'total_incidents' => $total_incidents_result ? $total_incidents_result['count'] : 0,
+        'active_incidents' => $active_incidents_result ? $active_incidents_result['count'] : 0,
+        'total_users' => $total_users_result ? $total_users_result['count'] : 0,
+        'verified_partners' => $verified_partners_result ? $verified_partners_result['count'] : 0
     ];
 } catch (Throwable $e) {
     error_log("Landing page stats error: " . $e->getMessage());
@@ -22,14 +22,13 @@ try {
 
 // Get recent incidents
 try {
-    $recent_incidents_stmt = $db->query("
+    $recent_incidents = $db->fetchAll("
         SELECT i.*, u.full_name as reporter_name 
         FROM incidents i 
         LEFT JOIN users u ON i.user_id = u.id 
         ORDER BY i.created_at DESC 
         LIMIT 6
-    ");
-    $recent_incidents = $recent_incidents_stmt ? $recent_incidents_stmt->fetchAll() : [];
+    ", []);
 } catch (Throwable $e) {
     error_log("Landing page incidents error: " . $e->getMessage());
     $recent_incidents = [];

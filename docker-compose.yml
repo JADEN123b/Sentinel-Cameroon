@@ -1,0 +1,29 @@
+version: "3.8"
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: sentinel-cameroon
+    ports:
+      - "8080:80"
+    volumes:
+      - ./:/var/www/html
+      - db_data:/var/www/html/database/data
+      - ./uploads:/var/www/html/uploads
+      - ./logs:/var/log/apache2
+    environment:
+      - DB_PATH=/var/www/html/database/data/sentinel_cameroon.sqlite
+      - RENDER=false
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  db_data:
+    driver: local

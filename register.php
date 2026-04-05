@@ -32,7 +32,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $db = new Database();
 
         // Check if user already exists
-        $existing = $db->query("SELECT id FROM users WHERE email = ? OR username = ?", [$email, $username])->fetch();
+        $existing = $db->fetch("SELECT id FROM users WHERE email = ? OR username = ?", [$email, $username]);
         if ($existing) {
             $error = 'This email or username is already registered. Please sign in instead.';
         } else {

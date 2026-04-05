@@ -31,13 +31,23 @@ $where_clause = !empty($where_conditions) ? 'WHERE ' . implode(' AND ', $where_c
 
 // Get incidents
 $db = new Database();
-$incidents = $db->query("
+$result = $db->query("
     SELECT i.*, u.full_name as reporter_name, u.profile_picture as reporter_picture 
     FROM incidents i 
     LEFT JOIN users u ON i.user_id = u.id 
     $where_clause
     ORDER BY i.created_at DESC
-", $params)->fetchAll();
+", $params);
+
+if ($result === false) {
+    error_log("Failed to fetch incidents - database error");
+    $incidents = [];
+} else {
+    $incidents = $result->fetchAll();
+    if ($incidents === false) {
+        $incidents = [];
+    }
+}
 ?>
 
 <div class="animate-rs">

@@ -50,7 +50,7 @@ try {
 
     // 3. Dispatch escalation emails to all Admins & Authorities
     $emailService = new PHPMailerEmailService();
-    $authorities  = $db->query("SELECT email, full_name FROM users WHERE role IN ('admin', 'authority') AND email IS NOT NULL")->fetchAll();
+    $authorities = $db->fetchAll("SELECT email, full_name FROM users WHERE role IN ('admin', 'authority') AND email IS NOT NULL", []);
 
     foreach ($authorities as $auth) {
         $emailService->sendIncidentNotification(

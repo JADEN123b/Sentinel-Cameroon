@@ -13,10 +13,14 @@ require_once 'includes/header.php';
 $db = new Database();
 
 // --- 1. STATISTICS ---
+$total_reports_result = $db->fetch("SELECT COUNT(*) as count FROM incidents");
+$pending_result = $db->fetch("SELECT COUNT(*) as count FROM incidents WHERE status = 'reported'");
+$active_result = $db->fetch("SELECT COUNT(*) as count FROM incidents WHERE status = 'investigating'");
+
 $stats = [
-    'total_reports' => $db->query("SELECT COUNT(*) as count FROM incidents")->fetch()['count'],
-    'pending' => $db->query("SELECT COUNT(*) as count FROM incidents WHERE status = 'reported'")->fetch()['count'],
-    'active' => $db->query("SELECT COUNT(*) as count FROM incidents WHERE status = 'investigating'")->fetch()['count'],
+    'total_reports' => $total_reports_result ? $total_reports_result['count'] : 0,
+    'pending' => $pending_result ? $pending_result['count'] : 0,
+    'active' => $active_result ? $active_result['count'] : 0,
     'resolved_today' => $db->query("SELECT COUNT(*) as count FROM incidents WHERE status = 'resolved' AND DATE(updated_at) = CURDATE()")->fetch()['count'],
     'total_users' => $db->query("SELECT COUNT(*) as count FROM users")->fetch()['count'],
     'unverified' => $db->query("SELECT COUNT(*) as count FROM users WHERE is_verified = 0")->fetch()['count'],
@@ -762,6 +766,7 @@ $pending_payments = $db->query("
     </div>
 </div>
 
+<script src="assets/js/api-client.js"></script>
 <script>
     function showTab(tabId) {
         document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
@@ -777,15 +782,15 @@ $pending_payments = $db->query("
         });
     }
 
-    function manageRevenue(action, params) {
+    async function manageRevenue(action, params) {
         if (!confirm('Confirm revenue action: ' + action + '?')) return;
-        fetch('api/manage_revenue.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: action, ...params })
-        })
-        .then(r => r.json())
-        .then(d => d.success ? location.reload() : alert('Error: ' + d.message));
+        const result = await API.post('api/manage_revenue.php', { action: action, ...params });
+        if (result.success && result.data.success) {
+            location.reload();
+        } else {
+            alert('Error: ' + (result.data?.message || result.error));
+            console.error('Revenue action failed:', result);
+        }
     }
 
     function openSponsorModal(id, name) {
@@ -826,24 +831,20 @@ $pending_payments = $db->query("
             tier: document.getElementById('subTier').value,
             expiry: document.getElementById('subExpiry').value
         };
-        fetch('api/manage_revenue.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'set_authority_subscription', ...params })
-        })
-        .then(r => r.json())
-        .then(d => d.success ? location.reload() : alert('Error: ' + d.message));
+        manageRevenue('set_authority_subscription', params);
     }
 
-    function updateStatus(id, newStatus) {
+    async function updateStatus(id, newStatus) {
         if (!confirm('Update incident to ' + newStatus + '?')) return;
-        fetch('api/update_status.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ incident_id: id, status: newStatus })
-        })
-            .then(r => r.json())
-            .then(d => d.success ? location.reload() : alert('Error: ' + d.message));
+        const result = await API.post('api/update_status.php', {
+            incident_id: id,
+            status: newStatus
+        });
+        if (result.success && result.data.success) {
+            location.reload();
+        } else {
+            alert('Error: ' + (result.data?.message || result.error));
+        }
     }
 
     function approveAuth(id) {
@@ -856,43 +857,45 @@ $pending_payments = $db->query("
         processAuth(id, 'rejected');
     }
 
-    function processAuth(id, status) {
-        fetch('api/verify_authority.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ user_id: id, status: status })
-        })
-            .then(r => r.json())
-            .then(d => d.success ? location.reload() : alert('Error: ' + d.message));
+    async function processAuth(id, status) {
+        const result = await API.post('api/verify_authority.php', {
+            user_id: id,
+            status: status
+        });
+        if (result.success && result.data.success) {
+            location.reload();
+        } else {
+            alert('Error: ' + (result.data?.message || result.error));
+        }
     }
 
-    document.getElementById('alertForm').addEventListener('submit', function (e) {
+    document.getElementById('alertForm').addEventListener('submit', async function (e) {
         e.preventDefault();
         const b = this.querySelector('button');
         b.innerText = 'BROADCASTING...';
         b.disabled = true;
 
-        fetch('api/create_alert.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
+        try {
+            const result = await API.post('api/create_alert.php', {
                 title: document.getElementById('alertTitle').value,
                 message: document.getElementById('alertMessage').value,
                 type: document.getElementById('alertType').value,
                 duration: document.getElementById('alertDuration').value
-            })
-        })
-            .then(r => r.json())
-            .then(d => {
-                if (d.success) {
-                    alert('Success: Alert sent to all nodes.');
-                    this.reset();
-                } else alert('Error: ' + d.message);
-            })
-            .finally(() => {
-                b.innerText = 'SEND EMERGENCY ALERT';
-                b.disabled = false;
             });
+            if (result.success && result.data.success) {
+                alert('Success: Alert sent to all nodes.');
+                this.reset();
+            } else {
+                alert('Error: ' + (result.data?.message || result.error));
+                console.error('Alert create failed:', result);
+            }
+        } catch (error) {
+            alert('Error sending alert: ' + error);
+            console.error('Alert submission error:', error);
+        } finally {
+            b.innerText = 'SEND EMERGENCY ALERT';
+            b.disabled = false;
+        }
     });
     // Sync Bottom Nav with showTab
     const originalShowTab = window.showTab;
