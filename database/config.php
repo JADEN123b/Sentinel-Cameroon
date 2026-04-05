@@ -5,26 +5,32 @@
  */
 
 class Database {
-    private $host = '127.0.0.1';
-    private $dbname = 'sentinel_cameroon';
-    private $username = 'root';
-    private $password = '';
+    private $host;
+    private $dbname;
+    private $username;
+    private $password;
+    private $port;
     private $charset = 'utf8mb4';
     
     public $conn;
     
     public function __construct() {
+        $this->host = getenv('DB_HOST') ?: '127.0.0.1';
+        $this->dbname = getenv('DB_NAME') ?: 'sentinel_cameroon';
+        $this->username = getenv('DB_USER') ?: 'root';
+        $this->password = getenv('DB_PASS') ?: '';
+        $this->port = getenv('DB_PORT') ?: '3307';
         $this->connect();
     }
     
     public function connect() {
         try {
-            $dsn = "mysql:host={$this->host};port=3307;dbname={$this->dbname};charset={$this->charset}";
+            $dsn = "mysql:host={$this->host};port={$this->port};dbname={$this->dbname};charset={$this->charset}";
             $options = [
                 PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
                 PDO::ATTR_EMULATE_PREPARES => false,
-                PDO::ATTR_TIMEOUT => 5, // 5 second timeout to prevent infinite loading
+                PDO::ATTR_TIMEOUT => 5,
             ];
             
             $this->conn = new PDO($dsn, $this->username, $this->password, $options);
